@@ -1,0 +1,26 @@
+# Downloaded toolchain binaries (~800MB) -- never commit these.
+# Reproduce with: scripts/get-sui.sh  (see README)
+.tools/
+
+# Move build output
+build/
+**/build/
+
+# Rust build output
+target/
+**/target/
+
+# Node
+node_modules/
+
+# Local keys & env -- CRITICAL: never commit a private key
+.env
+*.key
+sui.keystore
+client.yaml
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
