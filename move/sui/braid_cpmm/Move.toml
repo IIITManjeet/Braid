@@ -1,0 +1,14 @@
+[package]
+name = "braid_cpmm"
+edition = "2024.beta"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[dependencies]
+# Local while braid_math is unpublished. On testnet deploy this becomes an
+# on-chain dependency pinned to the published package id, because Sui publishes
+# one package per transaction and braid_math goes first.
+braid_math = { local = "../braid_math" }
+
+[addresses]
+braid_cpmm = "0x0"

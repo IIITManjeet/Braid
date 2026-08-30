@@ -38,8 +38,8 @@ If the Rust replica and the chain ever disagree by one unit, the test fails.
 
 ```
 move/sui/braid_math/     Q64.64 fixed-point, mul_div with u256 intermediates, sqrt   [done]
-move/sui/braid_cpmm/     constant-product pool                                      [next]
-move/sui/braid_stable/   Curve-style stableswap
+move/sui/braid_cpmm/     constant-product pool                                      [done]
+move/sui/braid_stable/   Curve-style stableswap                                     [next]
 move/sui/braid_clmm/     concentrated liquidity
 move/sui/braid_clob/     central limit order book
 move/sui/braid_router/   atomic multi-venue route execution
@@ -65,12 +65,18 @@ sui --version
 
 Also required: Rust (1.96+) and Node 18+. Aptos CLI is only needed for phase 2.
 
+Every package's tests, in one go:
+
+```bash
+bash scripts/test.sh
+```
+
 ## Status
 
 - [x] Repo, toolchain, `braid_math::full_math`
 - [x] `braid_math::q64` — Q64.64 fixed-point
 - [x] `braid_math` test suite (47 tests)
-- [ ] CPMM pool + swap
+- [x] CPMM pool + swap (37 tests)
 - [ ] Deploy to Sui testnet
 - [ ] Rust quote engine + differential fuzzer
 - [ ] StableSwap, CLMM, CLOB, router
