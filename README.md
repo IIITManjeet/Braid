@@ -37,8 +37,8 @@ If the Rust replica and the chain ever disagree by one unit, the test fails.
 ## Layout
 
 ```
-move/sui/braid_math/     Q64.64 fixed-point, mul_div with u256 intermediates, sqrt   [in progress]
-move/sui/braid_cpmm/     constant-product pool
+move/sui/braid_math/     Q64.64 fixed-point, mul_div with u256 intermediates, sqrt   [done]
+move/sui/braid_cpmm/     constant-product pool                                      [next]
 move/sui/braid_stable/   Curve-style stableswap
 move/sui/braid_clmm/     concentrated liquidity
 move/sui/braid_clob/     central limit order book
@@ -68,7 +68,8 @@ Also required: Rust (1.96+) and Node 18+. Aptos CLI is only needed for phase 2.
 ## Status
 
 - [x] Repo, toolchain, `braid_math::full_math`
-- [ ] `braid_math` test suite
+- [x] `braid_math::q64` — Q64.64 fixed-point
+- [x] `braid_math` test suite (47 tests)
 - [ ] CPMM pool + swap
 - [ ] Deploy to Sui testnet
 - [ ] Rust quote engine + differential fuzzer
