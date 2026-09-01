@@ -39,8 +39,8 @@ If the Rust replica and the chain ever disagree by one unit, the test fails.
 ```
 move/sui/braid_math/     Q64.64 fixed-point, mul_div with u256 intermediates, sqrt   [done]
 move/sui/braid_cpmm/     constant-product pool                                      [done]
-move/sui/braid_stable/   Curve-style stableswap                                     [next]
-move/sui/braid_clmm/     concentrated liquidity
+move/sui/braid_stable/   Curve-style stableswap                                     [done]
+move/sui/braid_clmm/     concentrated liquidity                                     [next]
 move/sui/braid_clob/     central limit order book
 move/sui/braid_router/   atomic multi-venue route execution
 move/aptos/              phase 2: the port, plus a dialect-comparison writeup
@@ -51,6 +51,13 @@ docs/                    design notes, invariant derivations
 
 Each `move/sui/*` folder is a separate Sui package: Sui publishes one package per transaction,
 so `braid_math` is published first and the others import it as an on-chain dependency.
+
+## Notes from the build
+
+- [When Newton-Raphson never converges](docs/stableswap-limit-cycles.md) --
+  the StableSwap `D` solver has states where it orbits forever instead of
+  converging, and Curve's own implementation reverts on them. What causes it,
+  and how `braid_stable` resolves it safely.
 
 ## Toolchain
 
@@ -77,7 +84,8 @@ bash scripts/test.sh
 - [x] `braid_math::q64` — Q64.64 fixed-point
 - [x] `braid_math` test suite (47 tests)
 - [x] CPMM pool + swap (37 tests)
+- [x] StableSwap pool + Newton-Raphson solver (46 tests)
 - [ ] Deploy to Sui testnet
 - [ ] Rust quote engine + differential fuzzer
-- [ ] StableSwap, CLMM, CLOB, router
+- [ ] CLMM, CLOB, router
 - [ ] Aptos port
