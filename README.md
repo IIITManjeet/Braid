@@ -52,6 +52,32 @@ docs/                    design notes, invariant derivations
 Each `move/sui/*` folder is a separate Sui package: Sui publishes one package per transaction,
 so `braid_math` is published first and the others import it as an on-chain dependency.
 
+## Live on Sui testnet
+
+All four packages are published, and the StableSwap pool has been exercised
+end to end with a real swap.
+
+| Package | Address |
+|---|---|
+| `braid_math` | `0x7bb8f3e41cd60941b0df6fd139d6df65e1dd5128e3b5a9394ad726a4a2b2f72a` |
+| `braid_cpmm` | `0xcaee4def84ca508c1f1e6269847a1b51798b1dfae7d07d1a0fef548676f675a2` |
+| `braid_stable` | `0x9f4d6e25313f06958c36d0291de02e6ca1e3298c634fa35b0e6b47290b13f3b5` |
+| `braid_test_coins` | `0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699` |
+
+A live TUSD/TUSDT pool at `A = 100`, 4 bps, seeded 1:1 with 1e9 a side:
+`0x4deab90d8255e19e8ac72916d41198dff7b3767a18e02260e611b59a0fe8e76a`
+
+The first swap through it
+([`2g5GigCt...`](https://suiscan.xyz/testnet/tx/2g5GigCtPdPizEYJJffzGmY2rPHbHrC7X23gEq8QXF82))
+put 1,000,000 TUSD in and returned **999,590** TUSDT, leaving `D` at
+**2,000,000,400** -- up by exactly the 400-unit fee.
+
+Both numbers match the Move test suite and the independent Python reference to
+the unit. The chain, the tests, and the replica all agree.
+
+Addresses and object ids are recorded in [`deployments/testnet.json`](deployments/testnet.json).
+Redeploy or extend with `bash scripts/deploy.sh`.
+
 ## Notes from the build
 
 - [When Newton-Raphson never converges](docs/stableswap-limit-cycles.md) --
@@ -85,7 +111,7 @@ bash scripts/test.sh
 - [x] `braid_math` test suite (47 tests)
 - [x] CPMM pool + swap (37 tests)
 - [x] StableSwap pool + Newton-Raphson solver (46 tests)
-- [ ] Deploy to Sui testnet
+- [x] Deploy to Sui testnet
 - [ ] Rust quote engine + differential fuzzer
 - [ ] CLMM, CLOB, router
 - [ ] Aptos port

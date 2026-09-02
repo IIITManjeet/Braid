@@ -24,3 +24,7 @@ client.yaml
 Thumbs.db
 .vscode/
 .idea/
+
+# Personal study notes -- a learning/reference resource, not part of the repo.
+# Regenerate or edit freely; nothing here is imported by the build.
+study/

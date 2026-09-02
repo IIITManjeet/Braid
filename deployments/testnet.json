@@ -1,0 +1,42 @@
+{
+  "_deployer": "0x1f7994dc670b53f5d2ad39c0d42b9e9645599b7b9b0248d7233c03c1fd871998",
+  "_network": "testnet",
+  "braid_cpmm": {
+    "packageId": "0xcaee4def84ca508c1f1e6269847a1b51798b1dfae7d07d1a0fef548676f675a2"
+  },
+  "braid_math": {
+    "packageId": "0x7bb8f3e41cd60941b0df6fd139d6df65e1dd5128e3b5a9394ad726a4a2b2f72a"
+  },
+  "braid_stable": {
+    "digest": "FCK9pW6L3rWqBkxgx1pM4qiJ63nmxeAxvHFcxUxdruDv",
+    "packageId": "0x9f4d6e25313f06958c36d0291de02e6ca1e3298c634fa35b0e6b47290b13f3b5"
+  },
+  "braid_test_coins": {
+    "digest": "HGE9UrSuvy6BSY6GAAQ5Uo25Ba7shAQuWXDjkfLRz2jz",
+    "packageId": "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699"
+  },
+  "firstSwap": {
+    "amountIn": 1000000,
+    "amountOut": 999590,
+    "digest": "2g5GigCtPdPizEYJJffzGmY2rPHbHrC7X23gEq8QXF82",
+    "invariantDAfter": 2000000400,
+    "note": "matches stable_math_tests and the Python reference exactly"
+  },
+  "pools": {
+    "stable_TUSD_TUSDT": {
+      "amp": 10000,
+      "createdIn": "F6BGfAssKd6Ce6CJ5wYZY6a54VKs2xEjg4qmM5rYXBNj",
+      "feeBps": 4,
+      "poolId": "0x4deab90d8255e19e8ac72916d41198dff7b3767a18e02260e611b59a0fe8e76a",
+      "seededWith": [
+        1000000000,
+        1000000000
+      ]
+    }
+  },
+  "testCoinTreasuries": {
+    "TETH": "0xebc593dce52990bca8eb4cedade24af532f95e0a86a7017b7964123e466da24f",
+    "TUSD": "0xea653a804f1b788f277f1f311c3578f5d974151ef7c9cbc4294ec5f157130687",
+    "TUSDT": "0x8e14eccf04a79cfa31f76f70508ff66f97e52de5294019faee8f0b775f539550"
+  }
+}
