@@ -22,4 +22,16 @@ for pkg in "$ROOT"/move/sui/*/; do
   echo
 done
 
+# The Rust replica: its own unit tests, and the source of the differential
+# cases the Move suites above just ran.
+if command -v cargo >/dev/null 2>&1; then
+  echo "=== rust (braid-quote) ==="
+  if ! (cd "$ROOT/node" && cargo test --quiet); then
+    failed=1
+  fi
+  echo
+else
+  echo "cargo not found -- skipping the Rust replica tests" >&2
+fi
+
 exit "$failed"

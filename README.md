@@ -30,9 +30,42 @@ route atomically under a slippage bound.
 
 ## The headline test
 
-A **differential fuzzer**: generate random swaps, run each through the Rust quote engine *and*
-through the on-chain Move code via `sui client dev-inspect`, and assert bit-exact agreement.
-If the Rust replica and the chain ever disagree by one unit, the test fails.
+A **differential fuzzer**. `node/crates/braid-quote` is a Rust replica of the pricing math --
+a transliteration, not a reimplementation: where the Move widens to `u256` before dividing so
+does the Rust, and where it floor-divides twice in sequence rather than once by a product, so
+does the Rust. Floor division does not reassociate, so operation order is part of the spec.
+
+`braid-difftest` generates random pool states and trades, computes each answer with the
+replica, and emits them as Move test files. `sui move test` then runs every case through the
+real Move VM. **1,829 cases; a one-unit disagreement fails the build.**
+
+The generated files are committed on purpose. The RNG is seeded, so regenerating produces an
+identical file unless a *value* moved -- and then the diff names the case and the delta. A
+silent repricing becomes a reviewable line in a pull request.
+
+```bash
+cargo run -p braid-difftest    # regenerate, from node/
+bash scripts/test.sh           # Move VM checks every case
+```
+
+**What it proves:** the two implementations do not diverge. That catches a mis-transliterated
+operation order, a floor where the other has a ceil, a `u128` intermediate where the other
+widened -- the class of bug where the off-chain quote engine promises a price the chain will
+not honour.
+
+**What it does not prove:** that either side is economically right. Two implementations can
+agree and both be wrong. That is covered separately -- hand-derived fixtures, the invariant
+properties (`k` and `D` never decrease), and for StableSwap a third implementation in Python
+written from Curve's published reference rather than from this code.
+
+The harness is verified against a negative control: flipping one `mul_div_floor` to
+`mul_div_ceil` in the replica fails the generated suite immediately.
+
+**Not yet wired:** reading return values back from the deployed bytecode. `sui client
+--dev-inspect` on CLI 1.78 renders a dry run without return values, and the GraphQL
+`simulateTransaction` field wants a protobuf-shaped transaction rather than serialized BCS.
+The on-chain anchor for now is the real testnet swap below, whose result the replica
+reproduces exactly.
 
 ## Layout
 
@@ -44,7 +77,7 @@ move/sui/braid_clmm/     concentrated liquidity                                 
 move/sui/braid_clob/     central limit order book
 move/sui/braid_router/   atomic multi-venue route execution
 move/aptos/              phase 2: the port, plus a dialect-comparison writeup
-node/crates/             Rust: checkpoint ingest -> in-memory replica -> axum REST + WS
+node/crates/             Rust: braid-quote replica + difftest generator        [in progress]
 bench/                   gas costs per venue, p99 quote latency
 docs/                    design notes, invariant derivations
 ```
@@ -112,6 +145,6 @@ bash scripts/test.sh
 - [x] CPMM pool + swap (37 tests)
 - [x] StableSwap pool + Newton-Raphson solver (46 tests)
 - [x] Deploy to Sui testnet
-- [ ] Rust quote engine + differential fuzzer
+- [x] Rust quote engine + differential fuzzer (1,829 generated cases)
 - [ ] CLMM, CLOB, router
 - [ ] Aptos port

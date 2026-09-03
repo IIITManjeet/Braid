@@ -1,0 +1,11 @@
+[package]
+name = "braid-quote"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+# 256-bit integers. The Move code widens every intermediate to u256, and the
+# replica has to reproduce that exactly -- a u128 intermediate would overflow
+# where Move's does not, and the results would silently diverge.
+ethnum.workspace = true

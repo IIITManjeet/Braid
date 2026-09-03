@@ -1,0 +1,12 @@
+[workspace]
+resolver = "3"
+members = ["crates/braid-quote", "crates/braid-difftest"]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.0"
+license = "Apache-2.0"
+rust-version = "1.90"
+
+[workspace.dependencies]
+ethnum = "1"

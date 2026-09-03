@@ -1,0 +1,8 @@
+[package]
+name = "braid-difftest"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+braid-quote = { path = "../braid-quote" }
