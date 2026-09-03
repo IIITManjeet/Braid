@@ -8,15 +8,15 @@ use crate::full_math as fm;
 /// Mirrors the abort codes in the Move module.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CpmmError {
-    /// `EZeroAmount` — 0.
+    /// `EZeroAmount` -- 0.
     ZeroAmount,
-    /// `EInsufficientLiquidity` — 1.
+    /// `EInsufficientLiquidity` -- 1.
     InsufficientLiquidity,
-    /// `EInvalidFee` — 2.
+    /// `EInvalidFee` -- 2.
     InvalidFee,
-    /// `EOverflow` — 3.
+    /// `EOverflow` -- 3.
     Overflow,
-    /// `EZeroLiquidityMinted` — 4.
+    /// `EZeroLiquidityMinted` -- 4.
     ZeroLiquidityMinted,
     /// An abort raised inside `full_math` rather than here. Carries the inner
     /// error, because the Move abort would name `braid_math::full_math`.
@@ -54,7 +54,7 @@ const MAX_U64: u128 = u64::MAX as u128;
 // Fees
 // ---------------------------------------------------------------------------
 
-/// `ceil(amount_in * fee_bps / 10000)` — rounded up, so dust still pays.
+/// `ceil(amount_in * fee_bps / 10000)` -- rounded up, so dust still pays.
 pub fn fee_amount(amount_in: u64, fee_bps: u64) -> Result<u64> {
     if fee_bps > MAX_FEE_BPS {
         return Err(CpmmError::InvalidFee);

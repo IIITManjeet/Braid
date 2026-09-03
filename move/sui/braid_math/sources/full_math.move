@@ -1,20 +1,12 @@
 /// 256-bit-intermediate multiply-divide with explicit rounding control.
 ///
-/// Almost every price computation in an exchange is a `mul_div`. Two things go
-/// wrong if you write it naively:
+/// Two things go wrong writing `a * b / d` naively. The product overflows u128
+/// long before the quotient would, so intermediates widen to u256. And integer
+/// division truncates in one direction, which is not neutral -- a swap that
+/// rounds its output up leaks a unit on every fill.
 ///
-///   1. `a * b` overflows `u128` long before `a * b / d` would, so the
-///      intermediate has to be widened to `u256`.
-///   2. Integer division silently truncates, and truncation is not neutral --
-///      it always moves value in the same direction. A swap that rounds its
-///      output *up* leaks a unit to the trader on every fill; repeated a few
-///      million times that drains the pool. So the rounding direction has to
-///      be a deliberate choice at every call site, which means this library
-///      must not offer a default.
-///
-/// The convention used throughout Braid: **round in favour of the pool**.
-/// Exact-input swaps round the output down; exact-output swaps round the
-/// required input up.
+/// So there is no default rounding here. Every call site names a direction.
+/// The convention throughout Braid is to round in favour of the pool.
 module braid_math::full_math {
 
     // ------------------------------------------------------------------ //

@@ -24,67 +24,29 @@ apply_block = "\n".join(
 
 TEMPLATE = r'''/// Ticks and square-root prices.
 ///
-/// # The price grid
-///
-/// A concentrated-liquidity pool does not let liquidity sit at arbitrary
-/// prices. Prices live on a geometric grid:
-///
-/// ```text
-///   price(tick) = 1.0001^tick
-/// ```
-///
-/// Adjacent ticks are one basis point apart -- fine enough that the grid is
-/// invisible to a trader, coarse enough that a swap has a bounded number of
-/// boundaries to walk through.
-///
-/// Everything is carried as `sqrt(price)` rather than price, because the
+/// `price(tick) = 1.0001^tick`, carried as `sqrt(price)` in Q64.64 because the
 /// liquidity formulas are linear in the square root and quadratic in the price.
-/// Working in sqrt-space turns most of the swap arithmetic into additions.
+/// Adjacent ticks are one basis point apart.
 ///
-/// ```text
-///   sqrt_price(tick) = 1.0001^(tick/2)     as Q64.64
-/// ```
+/// The exponent is evaluated by bit decomposition: the product of
+/// `1.0001^(2^i / 2)` over the set bits of the tick, so twenty multiplications
+/// cover the range. Constants are held for negative exponents, keeping each
+/// below 1.0 so the running product cannot overflow; a positive tick inverts
+/// once at the end. Same construction as Uniswap V3, and the constants below
+/// came out identical to their published table.
 ///
-/// # How the exponent is evaluated
+/// The range is +/-689382, not Uniswap's +/-887272. They carry sqrt-prices as
+/// Q64.96; Q64.64 has 32 fewer fractional bits, and below tick -689382 adjacent
+/// ticks round to the same u128 -- 178,080 ticks alias onto their neighbours.
+/// That would let two positions share a boundary price and stop
+/// `tick_at_sqrt_price` being a left inverse, so the range is cut to where
+/// Q64.64 resolves every tick. Cut symmetrically, since inverting a pair
+/// negates every tick. What remains still spans 1.15e-30 to 8.67e29.
 ///
-/// There is no `pow` here, and a loop of `tick` multiplications would be
-/// hopeless. The exponent is decomposed into bits instead: `1.0001^(t/2)` is
-/// the product of `1.0001^(2^i / 2)` over the set bits of `t`, so twenty
-/// multiplications cover the entire range.
+/// Verified across all 1,378,765 ticks in range: strictly increasing, exact
+/// round trip.
 ///
-/// The constants are held for *negative* exponents, so every one is below 1.0
-/// and the running product cannot overflow. A positive tick is handled by
-/// inverting once at the end.
-///
-/// This is the construction Uniswap V3 uses. The constants below were derived
-/// independently at 120 decimal digits and came out identical to Uniswap's
-/// published table -- a useful check on both.
-///
-/// # Why the range is narrower than Uniswap's
-///
-/// Uniswap carries sqrt-prices as Q64.96 and supports ticks to +/-887272.
-/// Braid carries them as Q64.64 -- 32 fewer fractional bits -- and at the
-/// bottom of that range the price grid becomes coarser than the tick grid.
-/// Below tick -689382 adjacent ticks round to the *same* `u128`: 178,080 ticks
-/// alias onto their neighbours.
-///
-/// Aliasing would be a real defect. Two distinct positions could share a
-/// boundary price, and `tick_at_sqrt_price` could not be a left inverse of
-/// `sqrt_price_at_tick`. So the range is cut back to where Q64.64 resolves
-/// every tick -- and cut symmetrically, because inverting a pair negates every
-/// tick, and an asymmetric range would make the two orderings of a pair
-/// disagree about what is representable.
-///
-/// What remains is a price range of `1.15e-30` to `8.67e29`, a span of about
-/// `1e60`. No real pair comes close.
-///
-/// Verified across all 1,378,765 ticks in range: strictly increasing, and the
-/// round trip through `tick_at_sqrt_price` is exact.
-///
-/// # Generated constants
-///
-/// The `C0`..`C19` table below is emitted by `scripts/gen_tick_math.py`. Do not
-/// edit the literals by hand.
+/// C0..C19 are emitted by scripts/gen_tick_math.py. Do not edit the literals.
 module braid_clmm::tick_math {
     use braid_clmm::i32::{Self, I32};
 

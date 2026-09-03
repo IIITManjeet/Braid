@@ -1,24 +1,12 @@
-/// Q64.64 unsigned fixed-point.
+/// Q64.64 unsigned fixed-point: a u128 read as `raw / 2^64`.
 ///
-/// A value is a `u128` interpreted as `raw / 2^64`: the high 64 bits are the
-/// integer part, the low 64 bits the fraction. That gives a range of
-/// `[0, 2^64)` at a resolution of `2^-64` (~5.4e-20), which is what prices
-/// need -- an orderbook tick and a CLMM sqrt-price both have to survive being
-/// multiplied by a pool reserve without the rounding error reaching the last
-/// unit of the output amount.
-///
-/// Nothing in Braid prices anything negative, so there is no signed variant.
-/// Ticks are signed, but a tick is an exponent, not a price, and it lives in
+/// Range `[0, 2^64)` at a resolution of 2^-64, which is what prices need. There
+/// is no signed variant; ticks are the only signed quantity and they live in
 /// the CLMM package.
 ///
-/// Every operation that can lose information comes in a `_floor` / `_ceil`
-/// pair with no unsuffixed default, for the reason spelled out in `full_math`:
-/// truncation always moves value in one direction, so the direction has to be
-/// chosen at the call site.
-///
-/// Overflow and divide-by-zero aborts from the delegating operations
-/// (`mul_*`, `div_*`, `from_frac_*`, `sqrt`) carry `full_math`'s abort codes,
-/// not this module's.
+/// Lossy operations come in _floor/_ceil pairs with no unsuffixed default, for
+/// the reason full_math gives. Overflow and divide-by-zero from the delegating
+/// operations carry full_math's abort codes, not this module's.
 module braid_math::q64 {
     use braid_math::full_math;
 

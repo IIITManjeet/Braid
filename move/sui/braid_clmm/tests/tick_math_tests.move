@@ -3,7 +3,7 @@ module braid_clmm::tick_math_tests {
     use braid_clmm::i32::{Self, I32};
     use braid_clmm::tick_math;
 
-    /// `1.0` in Q64.64 — the price at tick 0.
+    /// `1.0` in Q64.64 -- the price at tick 0.
     const ONE_Q64: u128 = 18446744073709551616;
 
     fun pos(v: u32): I32 { i32::from_u32(v) }
@@ -66,7 +66,7 @@ module braid_clmm::tick_math_tests {
 
     #[test]
     fun price_is_strictly_increasing_in_tick() {
-        // Sampled across the range rather than exhaustive — all 1,378,765
+        // Sampled across the range rather than exhaustive -- all 1,378,765
         // ticks were checked in the generator, this guards the port.
         let mut t: u32 = 0;
         let mut prev_pos = tick_math::sqrt_price_at_tick(i32::zero());

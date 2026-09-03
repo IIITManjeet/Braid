@@ -32,7 +32,7 @@ module braid_clmm::liquidity_math_tests {
         assert!(a0 == 100036665958, 0);
         assert!(a1 == 0, 1);
 
-        // Exactly at the lower bound is still "below" — the range is
+        // Exactly at the lower bound is still "below" -- the range is
         // half-open, so no token1 has accumulated yet.
         let (b0, b1) = lm::amounts_for_liquidity(SA, SA, SB, L, false);
         assert!(b0 == 100036665958 && b1 == 0, 2);
@@ -134,7 +134,7 @@ module braid_clmm::liquidity_math_tests {
 
     #[test]
     fun outside_the_range_only_one_amount_is_consulted() {
-        // Below the range, token1 is irrelevant — passing none changes nothing.
+        // Below the range, token1 is irrelevant -- passing none changes nothing.
         let a = lm::liquidity_for_amounts(neg(2000), SA, SB, 1000000, 0);
         let b = lm::liquidity_for_amounts(neg(2000), SA, SB, 1000000, 999999999);
         assert!(a == b, 0);

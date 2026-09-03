@@ -16,13 +16,13 @@
 //! It does **not** prove either side is economically correct. Two
 //! implementations can agree and both be wrong. That is covered separately: the
 //! hand-derived fixtures in the Move suites, the invariant properties (`k` and
-//! `D` never decrease), and — for StableSwap — a third implementation in Python
+//! `D` never decrease), and -- for StableSwap -- a third implementation in Python
 //! written from Curve's published reference rather than from this code.
 //!
 //! # Why the output is committed
 //!
 //! The generated files are checked in on purpose. The RNG is seeded, so
-//! regenerating produces an identical file unless a *value* changed — and then
+//! regenerating produces an identical file unless a *value* changed -- and then
 //! the diff shows exactly which case moved and by how much. A silent repricing
 //! becomes a reviewable line in a pull request.
 //!

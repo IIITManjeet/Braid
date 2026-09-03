@@ -17,9 +17,9 @@ use ethnum::U256;
 /// is as detectable as a divergence in value.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MathError {
-    /// `EDivideByZero` — Move abort code 0.
+    /// `EDivideByZero` -- Move abort code 0.
     DivideByZero,
-    /// `EOverflow` — Move abort code 1.
+    /// `EOverflow` -- Move abort code 1.
     Overflow,
 }
 
@@ -42,7 +42,7 @@ fn u256(v: u128) -> U256 {
     U256::from(v)
 }
 
-/// Narrow a `u256` back to `u128`, checked — the Move `assert!(r <= MAX_U128)`.
+/// Narrow a `u256` back to `u128`, checked -- the Move `assert!(r <= MAX_U128)`.
 #[inline]
 fn narrow_u128(v: U256) -> Result<u128> {
     if v > u256(u128::MAX) {
@@ -63,7 +63,7 @@ pub fn full_mul(a: u128, b: u128) -> U256 {
 }
 
 // ---------------------------------------------------------------------------
-// mul_div — u128
+// mul_div -- u128
 // ---------------------------------------------------------------------------
 
 pub fn mul_div_floor(a: u128, b: u128, denom: u128) -> Result<u128> {
@@ -79,7 +79,7 @@ pub fn mul_div_ceil(a: u128, b: u128, denom: u128) -> Result<u128> {
     }
     let d = u256(denom);
     let n = full_mul(a, b);
-    // `n / d` plus a correction, never `(n + d - 1) / d` — the latter overflows
+    // `n / d` plus a correction, never `(n + d - 1) / d` -- the latter overflows
     // when `n` sits near the top of the u256 range.
     let mut r = n / d;
     if n % d != 0u128 {
@@ -102,7 +102,7 @@ pub fn mul_div_round(a: u128, b: u128, denom: u128) -> Result<u128> {
 }
 
 // ---------------------------------------------------------------------------
-// mul_div — u64 wrappers
+// mul_div -- u64 wrappers
 // ---------------------------------------------------------------------------
 
 pub fn mul_div_floor_u64(a: u64, b: u64, denom: u64) -> Result<u64> {
@@ -178,7 +178,7 @@ pub fn shl_div_ceil(a: u128, denom: u128, shift: u32) -> Result<u128> {
 
 /// Significant bits in `x`, 0 when `x == 0`.
 ///
-/// Binary search over the width, exactly as the Move version does — eight
+/// Binary search over the width, exactly as the Move version does -- eight
 /// comparisons regardless of input.
 pub fn bit_length(x: U256) -> u16 {
     if x == 0u128 {

@@ -1,53 +1,28 @@
 /// The StableSwap invariant, for a two-coin pool.
 ///
-/// # The curve
-///
-/// A constant-product pool prices a stablecoin pair terribly: swapping 1% of
-/// the reserves moves the price by ~1%, even though both sides are supposed to
-/// be worth the same. A constant-sum pool (`x + y = D`) prices it perfectly but
-/// can be drained to zero on one side. StableSwap interpolates between them:
-///
 /// ```text
-///   A n^n Σx  +  D  =  A D n^n  +  D^(n+1) / (n^n Πx)
-///   \_______/          \_______________________________/
-///    constant-sum              constant-product
+///   A n^n Sum(x) + D = A D n^n + D^(n+1) / (n^n Prod(x))
 /// ```
 ///
-/// The amplification coefficient `A` sets where the blend sits. Large `A`
-/// behaves like constant-sum near the balance point and only degrades into
-/// constant-product once the pool is badly skewed -- which is exactly the
-/// behaviour you want from a stable pair: flat pricing in normal conditions,
-/// and a hard floor that stops a depeg draining the pool.
+/// A blend of constant-sum (perfect pricing, drainable) and constant-product
+/// (poor pricing, undrainable), weighted by an amplification term that decays
+/// as the pool skews -- so the curve degrades into the one that cannot be
+/// drained exactly when it needs to.
 ///
-/// # Why this needs a solver
+/// Neither D nor the post-trade balance y can be isolated, so both are solved
+/// by Newton-Raphson. The iteration matches Curve's reference operation for
+/// operation, including where each intermediate floor-divides: the Rust replica
+/// has to reproduce these values exactly, and floor division does not
+/// reassociate.
 ///
-/// Neither `D` nor the post-trade balance `y` can be isolated. The invariant is
-/// a cubic in `D` (for `n = 2`) and a quadratic in `y`, and rather than special
-/// -casing the algebra per coin count, both are solved by Newton-Raphson. From
-/// the seeds used here convergence is quadratic, so the loops finish in well
-/// under ten steps rather than the 255 they are allowed.
+/// Over the integers it does not always terminate. Floor division makes each
+/// step a map on the integers, and such a map need not have a fixed point -- at
+/// extreme skew the iterate falls into a short orbit and `|x - x_prev| <= 1`
+/// never fires. Curve's implementation exhausts its budget and reverts;
+/// `resolve_cycle` detects the orbit instead.
 ///
-/// Except that over the integers they do not always finish at all. Floor
-/// division turns each iteration into a map on the integers, and such a map can
-/// have no fixed point -- at extreme skew the iterate falls into a short orbit
-/// and steps around it forever, never satisfying `|x - x_prev| <= 1`. Curve's
-/// implementation exhausts its iteration budget and reverts. `resolve_cycle`
-/// detects the orbit and picks a member instead; see its comment for why the
-/// maximum is the safe choice.
-///
-/// # Fidelity to Curve
-///
-/// The iteration is written to match Curve's reference implementation
-/// *operation for operation*, including where each intermediate floor-divides.
-/// That is not stylistic: the Rust quote engine has to reproduce these values
-/// bit-exactly, and floor division does not reassociate. Reordering two
-/// divisions here would silently put the replica one unit off.
-///
-/// # Precision
-///
-/// `A` is stored pre-multiplied by `A_PRECISION` so it can be tuned in
-/// hundredths. Every intermediate runs at `u256`, because `D^3` for reserves
-/// near `u64::MAX` needs ~195 bits.
+/// A is stored pre-multiplied by A_PRECISION. Every intermediate runs at u256,
+/// because D^3 for reserves near u64::MAX needs ~195 bits.
 module braid_stable::stable_math {
 
     // ------------------------------------------------------------------ //

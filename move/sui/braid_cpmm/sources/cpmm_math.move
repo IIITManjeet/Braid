@@ -1,32 +1,16 @@
 /// Constant-product pricing, as pure functions over amounts and reserves.
 ///
-/// Nothing here touches an object or a `TxContext`. That is deliberate: this
-/// module is the specification the Rust quote engine has to reproduce
-/// bit-for-bit, and keeping it free of Sui types means the differential fuzzer
-/// can reach every function through `sui client dev-inspect` without first
-/// constructing a pool.
+/// No Sui types anywhere. This module is the specification the Rust quote
+/// engine reproduces bit-for-bit, and staying object-free is what lets the
+/// differential fuzzer reach every function without first building a pool.
 ///
-/// # The invariant
+/// The pool promises `x * y` never decreases. A swap putting `dx` in and taking
+/// `dy` out must satisfy `(x + dx)(y - dy) >= x * y`, which rearranges to
+/// `dy = dx * y / (x + dx)`. The fee is charged on the input and retained, so
+/// `k` strictly grows on a fee-bearing swap -- that growth is the LP's return.
 ///
-/// A pool holds reserves `x` and `y` and promises that `x * y` never decreases.
-/// A swap that puts `dx` in and takes `dy` out must satisfy
-/// `(x + dx)(y - dy) >= x * y`, which rearranges to
-/// `dy <= dx * y / (x + dx)`. Taking that at equality and then rounding *down*
-/// is `amount_out`.
-///
-/// # Fees
-///
-/// The fee is charged on the input, before the swap math sees it, and is
-/// retained by the pool. So the fee both leaves the trader with less to swap
-/// *and* stays in the reserve -- which is what makes `k` strictly increase on a
-/// fee-bearing swap, and is why the LP share appreciates.
-///
-/// # Rounding
-///
-/// Per `braid_math::full_math`, every rounding decision goes the pool's way:
-/// the fee rounds up, the output rounds down, the required input rounds up, LP
-/// minted rounds down, LP burned pays out rounded down. The trader is never
-/// handed a unit that came from a truncation.
+/// Rounding always goes the pool's way: fee up, output down, required input up,
+/// LP minted down, LP burned paid out down.
 module braid_cpmm::cpmm_math {
     use braid_math::full_math;
 

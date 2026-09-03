@@ -1,20 +1,15 @@
 /// A signed 32-bit integer, because Move has none and ticks need one.
 ///
-/// Everything else in Braid is unsigned: amounts, reserves, prices, invariants.
-/// A tick is the exception, and it is the exception for a specific reason — a
-/// tick is not a price, it is the *exponent* of one. `price = 1.0001^tick`, so
-/// tick 0 is price 1.0, and every price below 1.0 needs a negative tick.
+/// Everything else in Braid is unsigned. A tick is the exception because it is
+/// not a price but the exponent of one -- `price = 1.0001^tick`, so anything
+/// below 1.0 needs a negative tick.
 ///
-/// # Representation
+/// Two's complement in a u32: one representation of zero, and add/sub need no
+/// case analysis. The arithmetic goes through u64 and reduces mod 2^32, since
+/// Move aborts on u32 overflow and two's complement depends on that wrap.
 ///
-/// Two's complement in a `u32`, exactly as hardware does it. The top bit is the
-/// sign; negation is `2^32 - bits`; addition is unsigned addition modulo `2^32`.
-/// Choosing two's complement over a `(sign, magnitude)` pair means there is only
-/// one representation of zero, and `add`/`sub` need no case analysis.
-///
-/// The cost is that the raw `bits` are meaningless read as a `u32` — `-1` is
-/// `4294967295` — so nothing outside this module should look at them. The
-/// accessors are the API.
+/// The raw bits are meaningless read as a u32 (-1 is 4294967295), so nothing
+/// outside this module should look at them.
 module braid_clmm::i32 {
 
     /// Magnitude exceeds what a signed 32-bit value can hold.
@@ -25,7 +20,7 @@ module braid_clmm::i32 {
     /// `2^31 - 1`. The largest representable magnitude.
     const MAX_MAGNITUDE: u32 = 2147483647;
     /// `2^32`, used as the modulus. Held as a `u64` because it does not fit a
-    /// `u32` — which is the entire point of doing the arithmetic one width up.
+    /// `u32` -- which is the entire point of doing the arithmetic one width up.
     const WRAP: u64 = 4294967296;
 
     public struct I32 has copy, drop, store {
@@ -54,7 +49,7 @@ module braid_clmm::i32 {
         }
     }
 
-    /// Reinterpret a raw bit pattern. For deserialisation only — prefer
+    /// Reinterpret a raw bit pattern. For deserialisation only -- prefer
     /// `from_u32` / `neg_from`, which cannot produce a surprising value.
     public fun from_bits(b: u32): I32 { I32 { bits: b } }
 
@@ -107,7 +102,7 @@ module braid_clmm::i32 {
     /// Signed less-than.
     ///
     /// Different signs: the negative one is smaller, no comparison needed.
-    /// Same sign: the unsigned comparison is already correct — for two
+    /// Same sign: the unsigned comparison is already correct -- for two
     /// negatives, `-2` is `0xFFFFFFFE` and `-1` is `0xFFFFFFFF`, and
     /// `0xFFFFFFFE < 0xFFFFFFFF` gives `-2 < -1`.
     public fun lt(a: I32, b: I32): bool {

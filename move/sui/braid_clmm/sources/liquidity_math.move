@@ -1,54 +1,22 @@
 /// Converting between a position's liquidity and the token amounts backing it.
 ///
-/// # What "liquidity" means here
-///
-/// In a constant-product pool, a provider owns a *fraction of the whole pool*.
-/// In a concentrated pool they own a fixed quantity of liquidity `L` that is
-/// only active while the price sits inside their chosen range. `L` is the
-/// analogue of `sqrt(x·y)` — it is the depth the position contributes, not a
-/// share of anything.
-///
-/// # The two legs
-///
-/// For a position spanning square-root prices `sa < sb`, both Q64.64:
+/// A concentrated position owns a fixed quantity of liquidity `L`, active only
+/// while the price sits inside its range -- not a share of the whole pool. For
+/// a range `sa < sb`, both Q64.64:
 ///
 /// ```text
-///   amount0 = L · (sb − sa) · 2^64 / (sa · sb)      the token0 leg
-///   amount1 = L · (sb − sa) / 2^64                  the token1 leg
+///   amount0 = L * (sb - sa) * 2^64 / (sa * sb)
+///   amount1 = L * (sb - sa) / 2^64
 /// ```
 ///
-/// Both are *linear in the sqrt-price difference*, which is the whole reason
-/// prices are carried as square roots: in price-space these would be quadratic
-/// and involve a root at every step.
+/// Both linear in the sqrt-price difference, which is why prices are carried as
+/// square roots at all. Below its range a position is entirely token0 (the
+/// price must rise through the range before any is sold); above it, entirely
+/// token1; inside, the current price splits it.
 ///
-/// Where the current price sits decides which legs exist:
-///
-/// ```text
-///   price below the range   position is entirely token0
-///   price inside            both legs, split at the current price
-///   price above             position is entirely token1
-/// ```
-///
-/// A position below its range holds only token0 because the price has to rise
-/// *through* the range before any token0 is sold — the position is waiting to
-/// sell. Above the range it has already sold everything and holds only token1.
-///
-/// # Rounding
-///
-/// `round_up` is a parameter rather than a default, for the reason `full_math`
-/// gives: the direction is a decision, not a detail.
-///
-///   - **Minting** rounds the required amounts **up** — the depositor pays at
-///     least what the liquidity is worth.
-///   - **Burning** rounds the returned amounts **down** — the pool pays out at
-///     most what the liquidity is worth.
-///   - **Deriving liquidity from amounts** rounds **down**, so the credited
-///     depth is always backed.
-///
-/// Composing these is safe in the direction that matters: credit
-/// `liquidity_for_amounts(paid)`, re-price it at `round_up`, and the result
-/// never exceeds what was paid. Checked across 660 positions in the reference
-/// implementation, worst shortfall zero.
+/// `round_up` is a parameter, not a default. Minting rounds required amounts
+/// up, burning rounds returned amounts down, and deriving liquidity from
+/// amounts rounds down so credited depth is always backed.
 module braid_clmm::liquidity_math {
 
     /// Range endpoints must be positive and distinct.
@@ -59,7 +27,7 @@ module braid_clmm::liquidity_math {
     const MAX_U64: u256 = 18446744073709551615;
     const MAX_U128: u256 = 340282366920938463463374607431768211455;
     /// `2^192 − 1`. `L · (sb − sa)` must stay inside this so the subsequent
-    /// `<< 64` cannot silently discard high bits — Move's shift truncates
+    /// `<< 64` cannot silently discard high bits -- Move's shift truncates
     /// rather than aborting, so the guard has to be explicit.
     const MAX_U192: u256 =
         6277101735386680763835789423207666416102355444464034512895;
@@ -114,7 +82,7 @@ module braid_clmm::liquidity_math {
     /// The token1 a position of `liquidity` holds across `[sqrt_a, sqrt_b]`.
     ///
     /// `L · (sb − sa) / 2^64`. Simpler than the token0 leg because no division
-    /// by the prices is involved — token1 is denominated in the same direction
+    /// by the prices is involved -- token1 is denominated in the same direction
     /// the sqrt-price moves.
     public fun amount1_delta(
         sqrt_a: u128,
@@ -199,7 +167,7 @@ module braid_clmm::liquidity_math {
     /// The liquidity a deposit of `(amount0, amount1)` supports.
     ///
     /// Inside the range both legs are required, so the answer is the **smaller**
-    /// of what each side supports — the same "mint against the scarcer side"
+    /// of what each side supports -- the same "mint against the scarcer side"
     /// rule the constant-product pool uses, for the same reason: crediting the
     /// larger would mint depth the deposit does not back.
     public fun liquidity_for_amounts(
@@ -231,7 +199,7 @@ module braid_clmm::liquidity_math {
     ///
     /// Separate from plain addition because a tick crossing subtracts the
     /// liquidity of every position ending there, and going below zero would
-    /// mean the tick accounting has drifted — an explicit abort beats a
+    /// mean the tick accounting has drifted -- an explicit abort beats a
     /// wrapped `u128`.
     public fun add_delta(liquidity: u128, delta: u128, is_add: bool): u128 {
         if (is_add) {

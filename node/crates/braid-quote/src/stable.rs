@@ -1,7 +1,7 @@
 //! Rust mirror of `braid_stable::stable_math`.
 //!
 //! Includes the limit-cycle detector. A replica that converged where the chain
-//! orbits — or picked a different orbit member — would disagree by a few units
+//! orbits -- or picked a different orbit member -- would disagree by a few units
 //! on exactly the states that are hardest to reason about, so the ring buffer
 //! and the take-the-maximum rule are reproduced exactly.
 
@@ -10,17 +10,17 @@ use ethnum::U256;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StableError {
-    /// `ENotConverged` — 0.
+    /// `ENotConverged` -- 0.
     NotConverged,
-    /// `EZeroAmount` — 1.
+    /// `EZeroAmount` -- 1.
     ZeroAmount,
-    /// `EInvalidAmp` — 2.
+    /// `EInvalidAmp` -- 2.
     InvalidAmp,
-    /// `EInsufficientLiquidity` — 3.
+    /// `EInsufficientLiquidity` -- 3.
     InsufficientLiquidity,
-    /// `EInvalidFee` — 4.
+    /// `EInvalidFee` -- 4.
     InvalidFee,
-    /// `EOverflow` — 5.
+    /// `EOverflow` -- 5.
     Overflow,
 }
 
@@ -78,7 +78,7 @@ fn narrow(v: U256) -> Result<u128> {
 // ---------------------------------------------------------------------------
 
 /// If `next` repeats a value still in the window, the iterate has closed an
-/// orbit. Returns the **maximum** over the orbit's members — overstating the
+/// orbit. Returns the **maximum** over the orbit's members -- overstating the
 /// invariant makes the pool pay out less, which is the safe direction.
 ///
 /// The scan starts at the match rather than at the window's start, because
@@ -106,7 +106,7 @@ fn push_bounded(history: &mut Vec<U256>, v: U256) {
 }
 
 // ---------------------------------------------------------------------------
-// D — the invariant
+// D -- the invariant
 // ---------------------------------------------------------------------------
 
 pub fn get_d(x0: u64, x1: u64, amp: u64) -> Result<u128> {
@@ -152,7 +152,7 @@ pub fn get_d(x0: u64, x1: u64, amp: u64) -> Result<u128> {
 }
 
 // ---------------------------------------------------------------------------
-// y — the post-trade balance
+// y -- the post-trade balance
 // ---------------------------------------------------------------------------
 
 pub fn get_y(x_new: u128, d: u128, amp: u64) -> Result<u128> {
@@ -296,7 +296,7 @@ pub fn initial_lp(x0: u64, x1: u64, amp: u64) -> Result<u64> {
     Ok(d as u64)
 }
 
-/// `n / (4(n-1))` at n = 2 — half the swap fee, rounded up.
+/// `n / (4(n-1))` at n = 2 -- half the swap fee, rounded up.
 pub fn imbalance_fee_bps(fee_bps: u64) -> u64 {
     fm::ceil_div_u256(u(fee_bps as u128), u(2)).as_u128() as u64
 }
@@ -377,7 +377,7 @@ pub fn withdraw_amounts(
     ))
 }
 
-/// `D / supply` as Q64.64 — the LP share price.
+/// `D / supply` as Q64.64 -- the LP share price.
 pub fn virtual_price(reserve_0: u64, reserve_1: u64, lp_supply: u64, amp: u64) -> Result<u128> {
     if lp_supply == 0 {
         return Err(StableError::InsufficientLiquidity);
