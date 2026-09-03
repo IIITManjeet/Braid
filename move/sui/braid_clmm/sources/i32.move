@@ -1,0 +1,128 @@
+/// A signed 32-bit integer, because Move has none and ticks need one.
+///
+/// Everything else in Braid is unsigned: amounts, reserves, prices, invariants.
+/// A tick is the exception, and it is the exception for a specific reason — a
+/// tick is not a price, it is the *exponent* of one. `price = 1.0001^tick`, so
+/// tick 0 is price 1.0, and every price below 1.0 needs a negative tick.
+///
+/// # Representation
+///
+/// Two's complement in a `u32`, exactly as hardware does it. The top bit is the
+/// sign; negation is `2^32 - bits`; addition is unsigned addition modulo `2^32`.
+/// Choosing two's complement over a `(sign, magnitude)` pair means there is only
+/// one representation of zero, and `add`/`sub` need no case analysis.
+///
+/// The cost is that the raw `bits` are meaningless read as a `u32` — `-1` is
+/// `4294967295` — so nothing outside this module should look at them. The
+/// accessors are the API.
+module braid_clmm::i32 {
+
+    /// Magnitude exceeds what a signed 32-bit value can hold.
+    const EOverflow: u64 = 0;
+
+    /// `1 << 31`. Set in every negative value.
+    const SIGN_BIT: u32 = 2147483648;
+    /// `2^31 - 1`. The largest representable magnitude.
+    const MAX_MAGNITUDE: u32 = 2147483647;
+    /// `2^32`, used as the modulus. Held as a `u64` because it does not fit a
+    /// `u32` — which is the entire point of doing the arithmetic one width up.
+    const WRAP: u64 = 4294967296;
+
+    public struct I32 has copy, drop, store {
+        bits: u32,
+    }
+
+    // ------------------------------------------------------------------ //
+    // Construction                                                       //
+    // ------------------------------------------------------------------ //
+
+    public fun zero(): I32 { I32 { bits: 0 } }
+
+    /// `+v`.
+    public fun from_u32(v: u32): I32 {
+        assert!(v <= MAX_MAGNITUDE, EOverflow);
+        I32 { bits: v }
+    }
+
+    /// `-v`, given the magnitude.
+    public fun neg_from(v: u32): I32 {
+        assert!(v <= MAX_MAGNITUDE, EOverflow);
+        if (v == 0) {
+            I32 { bits: 0 }
+        } else {
+            I32 { bits: ((WRAP - (v as u64)) as u32) }
+        }
+    }
+
+    /// Reinterpret a raw bit pattern. For deserialisation only — prefer
+    /// `from_u32` / `neg_from`, which cannot produce a surprising value.
+    public fun from_bits(b: u32): I32 { I32 { bits: b } }
+
+    /// The raw two's-complement bits. Meaningless as a magnitude.
+    public fun bits(x: I32): u32 { x.bits }
+
+    // ------------------------------------------------------------------ //
+    // Sign and magnitude                                                 //
+    // ------------------------------------------------------------------ //
+
+    public fun is_neg(x: I32): bool { x.bits >= SIGN_BIT }
+
+    /// `|x|`, as an unsigned magnitude.
+    public fun abs_u32(x: I32): u32 {
+        if (is_neg(x)) {
+            ((WRAP - (x.bits as u64)) as u32)
+        } else {
+            x.bits
+        }
+    }
+
+    public fun neg(x: I32): I32 {
+        if (x.bits == 0) {
+            x
+        } else {
+            I32 { bits: ((WRAP - (x.bits as u64)) as u32) }
+        }
+    }
+
+    // ------------------------------------------------------------------ //
+    // Arithmetic                                                         //
+    // ------------------------------------------------------------------ //
+    //
+    // Both go through `u64` and reduce modulo 2^32. Move aborts on `u32`
+    // overflow, so the wrap that two's complement depends on has to be done
+    // one width up and brought back down.
+
+    public fun add(a: I32, b: I32): I32 {
+        I32 { bits: ((((a.bits as u64) + (b.bits as u64)) % WRAP) as u32) }
+    }
+
+    public fun sub(a: I32, b: I32): I32 { add(a, neg(b)) }
+
+    // ------------------------------------------------------------------ //
+    // Comparison                                                         //
+    // ------------------------------------------------------------------ //
+
+    public fun eq(a: I32, b: I32): bool { a.bits == b.bits }
+
+    /// Signed less-than.
+    ///
+    /// Different signs: the negative one is smaller, no comparison needed.
+    /// Same sign: the unsigned comparison is already correct — for two
+    /// negatives, `-2` is `0xFFFFFFFE` and `-1` is `0xFFFFFFFF`, and
+    /// `0xFFFFFFFE < 0xFFFFFFFF` gives `-2 < -1`.
+    public fun lt(a: I32, b: I32): bool {
+        let a_neg = is_neg(a);
+        let b_neg = is_neg(b);
+        if (a_neg != b_neg) { a_neg } else { a.bits < b.bits }
+    }
+
+    public fun gt(a: I32, b: I32): bool { lt(b, a) }
+
+    public fun lte(a: I32, b: I32): bool { !lt(b, a) }
+
+    public fun gte(a: I32, b: I32): bool { !lt(a, b) }
+
+    public fun min(a: I32, b: I32): I32 { if (lt(a, b)) a else b }
+
+    public fun max(a: I32, b: I32): I32 { if (lt(a, b)) b else a }
+}

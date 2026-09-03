@@ -73,7 +73,7 @@ reproduces exactly.
 move/sui/braid_math/     Q64.64 fixed-point, mul_div with u256 intermediates, sqrt   [done]
 move/sui/braid_cpmm/     constant-product pool                                      [done]
 move/sui/braid_stable/   Curve-style stableswap                                     [done]
-move/sui/braid_clmm/     concentrated liquidity                                     [next]
+move/sui/braid_clmm/     concentrated liquidity                                     [in progress]
 move/sui/braid_clob/     central limit order book
 move/sui/braid_router/   atomic multi-venue route execution
 move/aptos/              phase 2: the port, plus a dialect-comparison writeup
@@ -146,5 +146,6 @@ bash scripts/test.sh
 - [x] StableSwap pool + Newton-Raphson solver (46 tests)
 - [x] Deploy to Sui testnet
 - [x] Rust quote engine + differential fuzzer (1,829 generated cases)
-- [ ] CLMM, CLOB, router
+- [ ] CLMM (tick math done; liquidity, swap stepping, pool to come)
+- [ ] CLOB, router
 - [ ] Aptos port

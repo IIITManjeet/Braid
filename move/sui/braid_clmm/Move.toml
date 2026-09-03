@@ -1,0 +1,11 @@
+[package]
+name = "braid_clmm"
+edition = "2024.beta"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[dependencies]
+braid_math = { local = "../braid_math" }
+
+[addresses]
+braid_clmm = "0x0"
