@@ -93,6 +93,26 @@ module braid_clmm::i32 {
 
     public fun sub(a: I32, b: I32): I32 { add(a, neg(b)) }
 
+    /// Arithmetic shift right, i.e. floor division by `2^n`.
+    ///
+    /// Not the same as shifting the raw bits: a logical shift pulls zeros into
+    /// the top, which turns a negative into a large positive. The sign bit has
+    /// to be smeared back down, so -1 >> 8 stays -1 rather than becoming
+    /// 16777215.
+    public fun shr(x: I32, n: u8): I32 {
+        if (n == 0) return x;
+        if (n >= 32) {
+            // Everything has shifted out; only the sign survives.
+            return if (is_neg(x)) { neg_from(1) } else { zero() }
+        };
+        let logical = x.bits >> n;
+        if (is_neg(x)) {
+            I32 { bits: logical | (4294967295u32 << (32 - n)) }
+        } else {
+            I32 { bits: logical }
+        }
+    }
+
     // ------------------------------------------------------------------ //
     // Comparison                                                         //
     // ------------------------------------------------------------------ //
