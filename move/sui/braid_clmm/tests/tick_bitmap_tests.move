@@ -83,7 +83,7 @@ module braid_clmm::tick_bitmap_tests {
             let spacing = spacings[s];
             let mut t = neg(500);
             let mut prev = tb::compress(t, spacing);
-            let mut i = 0;
+            let mut i: u64 = 0;
             while (i < 1000) {
                 t = i32::add(t, pos(1));
                 let c = tb::compress(t, spacing);
@@ -229,7 +229,7 @@ module braid_clmm::tick_bitmap_tests {
 
         let mut cursor = i32::zero();
         let mut found = vector<u32>[];
-        let mut guard = 0;
+        let mut guard: u64 = 0;
         while (guard < 10) {
             let (t, ok) = tb::next_initialized_tick_within_word(word, cursor, spacing, false);
             if (!ok) break;
