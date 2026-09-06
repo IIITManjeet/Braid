@@ -269,6 +269,128 @@ module braid_clob::book_tests {
     }
 
     // ---------------------------------------------------------------- //
+    // Quoting without executing                                        //
+    // ---------------------------------------------------------------- //
+
+    #[test]
+    fun a_quote_walks_the_full_depth_and_changes_nothing() {
+        let mut sc = ts::begin(ALICE);
+        {
+            let mut book = book::empty(sc.ctx());
+            rest(&mut book, ALICE, 100, 5, false);
+            rest(&mut book, BOB, 101, 5, false);
+            rest(&mut book, CAROL, 102, 5, false);
+
+            // 12 units at up to 102: 5@100 + 5@101 + 2@102.
+            let (filled, cost) = book::quote(&book, 102, 12, true);
+            assert!(filled == 12, 0);
+            assert!(cost == 500 + 505 + 204, 1);
+
+            // The book is untouched, which is the whole point.
+            assert!(book::depth_at(&book, 100, false) == 5, 2);
+            assert!(book::best_ask(&book) == 100, 3);
+
+            drain(&mut book);
+            book::destroy_empty(book);
+        };
+        sc.end();
+    }
+
+    #[test]
+    fun a_quote_stops_at_the_limit_price() {
+        let mut sc = ts::begin(ALICE);
+        {
+            let mut book = book::empty(sc.ctx());
+            rest(&mut book, ALICE, 100, 5, false);
+            rest(&mut book, BOB, 105, 5, false);
+
+            let (filled, cost) = book::quote(&book, 100, 10, true);
+            assert!(filled == 5, 0);
+            assert!(cost == 500, 1);
+
+            drain(&mut book);
+            book::destroy_empty(book);
+        };
+        sc.end();
+    }
+
+    #[test]
+    fun a_quote_matches_what_the_order_actually_does() {
+        // The property the router depends on: quoting and executing agree.
+        let mut sc = ts::begin(ALICE);
+        {
+            let mut book = book::empty(sc.ctx());
+            rest(&mut book, ALICE, 100, 5, false);
+            rest(&mut book, BOB, 101, 4, false);
+            rest(&mut book, CAROL, 103, 6, false);
+
+            let (quoted_qty, quoted_cost) = book::quote(&book, 103, 12, true);
+
+            let (fills, _) =
+                book::place_limit_order(&mut book, @0xD, 103, 12, true, book::gtc());
+            let mut got: u64 = 0;
+            let mut paid: u128 = 0;
+            let mut i = 0;
+            while (i < fills.length()) {
+                got = got + book::fill_quantity(&fills[i]);
+                paid = paid
+                    + (book::fill_price(&fills[i]) as u128)
+                        * (book::fill_quantity(&fills[i]) as u128);
+                i = i + 1;
+            };
+
+            assert!(got == quoted_qty, 0);
+            assert!(paid == quoted_cost, 1);
+
+            drain(&mut book);
+            book::destroy_empty(book);
+        };
+        sc.end();
+    }
+
+    #[test]
+    fun quoting_an_empty_or_unreachable_book_yields_nothing() {
+        let mut sc = ts::begin(ALICE);
+        {
+            let mut book = book::empty(sc.ctx());
+            let (f0, c0) = book::quote(&book, 100, 10, true);
+            assert!(f0 == 0 && c0 == 0, 0);
+
+            rest(&mut book, ALICE, 200, 5, false);
+            // Nobody is selling as low as 100.
+            let (f1, c1) = book::quote(&book, 100, 10, true);
+            assert!(f1 == 0 && c1 == 0, 1);
+
+            // Total depth ignores the limit.
+            assert!(book::depth_to(&book, 999, true) == 5, 2);
+
+            drain(&mut book);
+            book::destroy_empty(book);
+        };
+        sc.end();
+    }
+
+    #[test]
+    fun selling_quotes_against_the_bids() {
+        let mut sc = ts::begin(ALICE);
+        {
+            let mut book = book::empty(sc.ctx());
+            rest(&mut book, ALICE, 100, 5, true);
+            rest(&mut book, BOB, 99, 5, true);
+            rest(&mut book, CAROL, 98, 5, true);
+
+            // Selling 12 down to 98 takes the best bids first.
+            let (filled, proceeds) = book::quote(&book, 98, 12, false);
+            assert!(filled == 12, 0);
+            assert!(proceeds == 500 + 495 + 196, 1);
+
+            drain(&mut book);
+            book::destroy_empty(book);
+        };
+        sc.end();
+    }
+
+    // ---------------------------------------------------------------- //
     // Order types                                                      //
     // ---------------------------------------------------------------- //
 

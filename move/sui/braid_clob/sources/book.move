@@ -26,10 +26,9 @@
 /// settles them. Keeping custody out means the matching logic can be tested
 /// without constructing balances.
 ///
-/// It also cannot yet quote depth beyond the best level without executing.
-/// Doing that read-only needs a successor operation on the crit-bit tree --
-/// "the next key after this one" -- which the router will require and which is
-/// not built. Fill-or-kill does not need it: an abort reverts the fills.
+/// `quote` walks the full depth read-only, which the tree's successor
+/// operation makes possible. That is what the router will use to compare this
+/// venue against the pools without executing anything.
 module braid_clob::book {
     use sui::table::{Self, Table};
     use braid_clob::critbit::{Self, CritbitTree};
@@ -239,6 +238,55 @@ module braid_clob::book {
             let bid = best_bid(book);
             bid != NONE && price <= bid
         }
+    }
+
+    /// What an order would fill against the book right now, without touching
+    /// it. Returns `(base_filled, quote_amount)`.
+    ///
+    /// `quote_amount` is the sum of `price * quantity` over the levels taken,
+    /// at `u128` because that product overflows a `u64` long before either
+    /// factor does. It is what the taker pays on a bid and receives on an ask.
+    ///
+    /// This walks the whole depth, not just the top: the tree's successor
+    /// operation is what makes that possible read-only. The router needs it to
+    /// compare this venue against the pools without executing anything.
+    public fun quote(book: &Book, price: u64, quantity: u64, is_bid: bool): (u64, u128) {
+        if (quantity == 0) return (0, 0);
+        let side = if (is_bid) { &book.asks } else { &book.bids };
+        if (critbit::is_empty(side)) return (0, 0);
+
+        let mut filled: u64 = 0;
+        let mut cost: u128 = 0;
+        // Start at the best price and walk away from it.
+        let mut leaf = if (is_bid) { critbit::min_leaf(side) } else { critbit::max_leaf(side) };
+
+        while (filled < quantity && leaf != critbit::none_index()) {
+            let level_price = critbit::leaf_key(side, leaf);
+            let acceptable = if (is_bid) { level_price <= price } else { level_price >= price };
+            if (!acceptable) break;
+
+            let available = critbit::borrow_leaf(side, leaf).total;
+            let want = quantity - filled;
+            let take = if (available < want) { available } else { want };
+
+            filled = filled + take;
+            cost = cost + (level_price as u128) * (take as u128);
+
+            if (filled == quantity) break;
+            leaf = if (is_bid) {
+                critbit::next_leaf(side, level_price)
+            } else {
+                critbit::prev_leaf(side, level_price)
+            };
+        };
+
+        (filled, cost)
+    }
+
+    /// Total resting quantity within a price bound, across every level.
+    public fun depth_to(book: &Book, price: u64, is_bid: bool): u64 {
+        let (filled, _) = quote(book, price, 18446744073709551615, is_bid);
+        filled
     }
 
     /// Place an order, matching against the book first.

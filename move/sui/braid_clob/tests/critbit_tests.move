@@ -314,6 +314,139 @@ module braid_clob::critbit_tests {
     }
 
     // ---------------------------------------------------------------- //
+    // Traversal                                                        //
+    // ---------------------------------------------------------------- //
+
+    #[test]
+    fun successors_and_predecessors_walk_the_whole_tree() {
+        let mut sc = ts::begin(OWNER);
+        {
+            let mut tree = critbit::empty<u64>(sc.ctx());
+            insert_all(&mut tree, vector[30, 10, 50, 20, 40]);
+
+            // Forward, starting below the minimum.
+            let mut walked = vector<u64>[];
+            let mut leaf = critbit::next_leaf(&tree, 0);
+            while (leaf != critbit::none_index()) {
+                let k = critbit::leaf_key(&tree, leaf);
+                walked.push_back(k);
+                leaf = critbit::next_leaf(&tree, k);
+            };
+            assert!(walked == vector[10u64, 20, 30, 40, 50], 0);
+
+            // Backward, starting above the maximum.
+            let mut back = vector<u64>[];
+            let mut leaf2 = critbit::prev_leaf(&tree, 999);
+            while (leaf2 != critbit::none_index()) {
+                let k = critbit::leaf_key(&tree, leaf2);
+                back.push_back(k);
+                leaf2 = critbit::prev_leaf(&tree, k);
+            };
+            assert!(back == vector[50u64, 40, 30, 20, 10], 1);
+
+            drain(&mut tree);
+            critbit::destroy_empty(tree);
+        };
+        sc.end();
+    }
+
+    #[test]
+    fun traversal_is_strict_and_works_from_absent_keys() {
+        let mut sc = ts::begin(OWNER);
+        {
+            let mut tree = critbit::empty<u64>(sc.ctx());
+            insert_all(&mut tree, vector[10, 20, 30]);
+
+            // Strictly greater and strictly less, so a present key is skipped.
+            assert!(critbit::leaf_key(&tree, critbit::next_leaf(&tree, 20)) == 30, 0);
+            assert!(critbit::leaf_key(&tree, critbit::prev_leaf(&tree, 20)) == 10, 1);
+
+            // From an absent key, land on the neighbours.
+            assert!(critbit::leaf_key(&tree, critbit::next_leaf(&tree, 15)) == 20, 2);
+            assert!(critbit::leaf_key(&tree, critbit::prev_leaf(&tree, 15)) == 10, 3);
+
+            // Past either end there is nothing.
+            assert!(critbit::next_leaf(&tree, 30) == critbit::none_index(), 4);
+            assert!(critbit::prev_leaf(&tree, 10) == critbit::none_index(), 5);
+
+            drain(&mut tree);
+            critbit::destroy_empty(tree);
+        };
+        sc.end();
+    }
+
+    #[test]
+    fun traversal_of_an_empty_tree_finds_nothing() {
+        let mut sc = ts::begin(OWNER);
+        {
+            let tree = critbit::empty<u64>(sc.ctx());
+            assert!(critbit::next_leaf(&tree, 100) == critbit::none_index(), 0);
+            assert!(critbit::prev_leaf(&tree, 100) == critbit::none_index(), 1);
+            critbit::destroy_empty(tree);
+        };
+        sc.end();
+    }
+
+    #[test]
+    fun traversal_agrees_with_a_linear_scan_from_every_probe() {
+        // The test that would have caught the bug the two above only found by
+        // luck. Descending toward a key follows *that key's* bits, and a key
+        // absent from the tree can diverge at a bit the tree does not branch
+        // on -- landing nowhere near where it belongs. Probing only round
+        // numbers hides that; probing everything does not.
+        let mut sc = ts::begin(OWNER);
+        {
+            let keys = vector[7u64, 11, 12, 40, 41, 100, 255, 256, 1000];
+            let mut tree = critbit::empty<u64>(sc.ctx());
+            insert_all(&mut tree, keys);
+
+            let mut probe: u64 = 0;
+            while (probe <= 1100) {
+                // Smallest stored key strictly greater than the probe.
+                let mut expected_next: u64 = 0;
+                let mut have_next = false;
+                let mut expected_prev: u64 = 0;
+                let mut have_prev = false;
+                let mut i = 0;
+                while (i < keys.length()) {
+                    let k = keys[i];
+                    if (k > probe && (!have_next || k < expected_next)) {
+                        expected_next = k;
+                        have_next = true;
+                    };
+                    if (k < probe && (!have_prev || k > expected_prev)) {
+                        expected_prev = k;
+                        have_prev = true;
+                    };
+                    i = i + 1;
+                };
+
+                let got_next = critbit::next_leaf(&tree, probe);
+                if (have_next) {
+                    assert!(got_next != critbit::none_index(), probe);
+                    assert!(critbit::leaf_key(&tree, got_next) == expected_next, probe);
+                } else {
+                    assert!(got_next == critbit::none_index(), probe);
+                };
+
+                let got_prev = critbit::prev_leaf(&tree, probe);
+                if (have_prev) {
+                    assert!(got_prev != critbit::none_index(), 10000 + probe);
+                    assert!(critbit::leaf_key(&tree, got_prev) == expected_prev, 10000 + probe);
+                } else {
+                    assert!(got_prev == critbit::none_index(), 10000 + probe);
+                };
+
+                probe = probe + 1;
+            };
+
+            drain(&mut tree);
+            critbit::destroy_empty(tree);
+        };
+        sc.end();
+    }
+
+    // ---------------------------------------------------------------- //
     // Guards                                                           //
     // ---------------------------------------------------------------- //
 

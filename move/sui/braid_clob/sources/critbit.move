@@ -173,6 +173,105 @@ module braid_clob::critbit {
     }
 
     // ------------------------------------------------------------------ //
+    // Traversal                                                          //
+    // ------------------------------------------------------------------ //
+    //
+    // At a node with mask `m`, every key on the right has that bit set and
+    // every key on the left does not -- and both subtrees agree on all higher
+    // bits. So everything right of a node is strictly greater than everything
+    // left of it. That is what makes these two functions work: descend toward
+    // the key, remembering the last subtree stepped past, and the answer is
+    // either the leaf landed on or the extreme of that remembered subtree.
+
+    /// Smallest key strictly greater than `key`, as a leaf index. `NONE` if
+    /// there is none. `key` need not be in the tree.
+    public fun next_leaf<V: store>(tree: &CritbitTree<V>, key: u64): u64 {
+        if (tree.root == NONE) return NONE;
+
+        let closest = descend(tree, key);
+        let closest_key = table::borrow(&tree.leaves, closest).key;
+
+        if (closest_key == key) {
+            // Present, so the descent followed real branches the whole way and
+            // the last right-subtree stepped past holds the successor.
+            let (candidate, _) = walk(tree, key, 0, true);
+            if (candidate == NONE) return NONE;
+            return leftmost(tree, candidate)
+        };
+
+        // Absent. The descent may have diverged from every stored key at a bit
+        // the tree does not branch on, so it cannot be trusted to have landed
+        // near `key`. Find where the divergence is and reason from there.
+        let divergence = critical_bit(closest_key, key);
+        let (candidate, subtree) = walk(tree, key, divergence, true);
+
+        if (key & divergence == 0) {
+            // Every key under `subtree` has that bit set, so all of them are
+            // greater than `key`. The smallest is the answer.
+            leftmost(tree, subtree)
+        } else {
+            // `key` is greater than everything under `subtree`, so look higher.
+            if (candidate == NONE) { NONE } else { leftmost(tree, candidate) }
+        }
+    }
+
+    /// Largest key strictly less than `key`. `NONE` if there is none.
+    public fun prev_leaf<V: store>(tree: &CritbitTree<V>, key: u64): u64 {
+        if (tree.root == NONE) return NONE;
+
+        let closest = descend(tree, key);
+        let closest_key = table::borrow(&tree.leaves, closest).key;
+
+        if (closest_key == key) {
+            let (candidate, _) = walk(tree, key, 0, false);
+            if (candidate == NONE) return NONE;
+            return rightmost(tree, candidate)
+        };
+
+        let divergence = critical_bit(closest_key, key);
+        let (candidate, subtree) = walk(tree, key, divergence, false);
+
+        if (key & divergence != 0) {
+            // `key` is above everything under `subtree`; its largest is the
+            // predecessor.
+            rightmost(tree, subtree)
+        } else {
+            if (candidate == NONE) { NONE } else { rightmost(tree, candidate) }
+        }
+    }
+
+    /// Descend toward `key`, stopping above `stop_mask`.
+    ///
+    /// Returns `(candidate, subtree)`. `candidate` is the last subtree stepped
+    /// past that lies on the side the caller cares about -- right-hand for a
+    /// successor search, left-hand for a predecessor. `subtree` is where the
+    /// descent stopped.
+    ///
+    /// Passing `stop_mask = 0` runs the descent to a leaf, which is what the
+    /// key-is-present case wants.
+    fun walk<V: store>(
+        tree: &CritbitTree<V>,
+        key: u64,
+        stop_mask: u64,
+        want_greater: bool,
+    ): (u64, u64) {
+        let mut candidate = NONE;
+        let mut current = tree.root;
+        while (current < PARTITION) {
+            let node = table::borrow(&tree.internal, current);
+            if (node.mask < stop_mask) break;
+            if (key & node.mask != 0) {
+                if (!want_greater) { candidate = node.left };
+                current = node.right;
+            } else {
+                if (want_greater) { candidate = node.right };
+                current = node.left;
+            };
+        };
+        (candidate, current)
+    }
+
+    // ------------------------------------------------------------------ //
     // Insertion                                                          //
     // ------------------------------------------------------------------ //
 
