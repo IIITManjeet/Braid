@@ -95,6 +95,7 @@ end to end with a real swap.
 | `braid_math` | `0x7bb8f3e41cd60941b0df6fd139d6df65e1dd5128e3b5a9394ad726a4a2b2f72a` |
 | `braid_cpmm` | `0xcaee4def84ca508c1f1e6269847a1b51798b1dfae7d07d1a0fef548676f675a2` |
 | `braid_stable` | `0x9f4d6e25313f06958c36d0291de02e6ca1e3298c634fa35b0e6b47290b13f3b5` |
+| `braid_clmm` | `0x53b3f796fa2716aee2a1b6a9e61bae58a728b8b0a5dddd10dfe7a7629a187034` |
 | `braid_test_coins` | `0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699` |
 
 A live TUSD/TUSDT pool at `A = 100`, 4 bps, seeded 1:1 with 1e9 a side:
@@ -107,6 +108,15 @@ put 1,000,000 TUSD in and returned **999,590** TUSDT, leaving `D` at
 
 Both numbers match the Move test suite and the independent Python reference to
 the unit. The chain, the tests, and the replica all agree.
+
+A live TUSD/TETH concentrated pool at 30 bps, tick spacing 60, with a position
+across ticks -600..600 holding 169,187,499 liquidity:
+`0x5eb924a166883bc6296c5c9944208541f0c2e88d8831985c99a5afb141586d6c`
+
+A swap through it
+([`4ZB7s5AK...`](https://suiscan.xyz/testnet/tx/4ZB7s5AKpVa2VRcJyhoQzq4M5wNZktb9j3uVT2B74FUD))
+put 100,000 TUSD in and returned **99,641** TETH for a fee of **300** -- exactly
+30 bps -- moving the price from tick 0 to tick -12.
 
 Addresses and object ids are recorded in [`deployments/testnet.json`](deployments/testnet.json).
 Redeploy or extend with `bash scripts/deploy.sh`.

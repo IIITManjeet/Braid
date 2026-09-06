@@ -476,6 +476,82 @@ module braid_clmm::pool {
     }
 
     // ------------------------------------------------------------------ //
+    // Transaction-callable wrappers                                      //
+    // ------------------------------------------------------------------ //
+    //
+    // `I32` is a struct, and a struct cannot be a transaction argument -- so
+    // every entry point that names a tick is unreachable from a PTB or a
+    // `sui client call`. These take the tick as a magnitude and a sign, which
+    // are primitives, and rebuild it inside.
+    //
+    // The `I32` versions above stay for Move callers: the router will hold
+    // ticks as values and should not have to decompose them.
+
+    fun tick_from(magnitude: u32, is_negative: bool): I32 {
+        if (is_negative) { i32::neg_from(magnitude) } else { i32::from_u32(magnitude) }
+    }
+
+    public fun add_liquidity_at<A, B>(
+        pool: &mut Pool<A, B>,
+        lower_magnitude: u32,
+        lower_is_negative: bool,
+        upper_magnitude: u32,
+        upper_is_negative: bool,
+        coin_a: Coin<A>,
+        coin_b: Coin<B>,
+        ctx: &mut TxContext,
+    ): (Coin<A>, Coin<B>) {
+        add_liquidity(
+            pool,
+            tick_from(lower_magnitude, lower_is_negative),
+            tick_from(upper_magnitude, upper_is_negative),
+            coin_a,
+            coin_b,
+            ctx,
+        )
+    }
+
+    public fun remove_liquidity_at<A, B>(
+        pool: &mut Pool<A, B>,
+        lower_magnitude: u32,
+        lower_is_negative: bool,
+        upper_magnitude: u32,
+        upper_is_negative: bool,
+        liquidity: u128,
+        ctx: &mut TxContext,
+    ) {
+        remove_liquidity(
+            pool,
+            tick_from(lower_magnitude, lower_is_negative),
+            tick_from(upper_magnitude, upper_is_negative),
+            liquidity,
+            ctx,
+        )
+    }
+
+    public fun collect_at<A, B>(
+        pool: &mut Pool<A, B>,
+        lower_magnitude: u32,
+        lower_is_negative: bool,
+        upper_magnitude: u32,
+        upper_is_negative: bool,
+        ctx: &mut TxContext,
+    ): (Coin<A>, Coin<B>) {
+        collect(
+            pool,
+            tick_from(lower_magnitude, lower_is_negative),
+            tick_from(upper_magnitude, upper_is_negative),
+            ctx,
+        )
+    }
+
+    /// The current tick as `(magnitude, is_negative)`, for off-chain readers
+    /// that cannot decode `I32`.
+    public fun current_tick_parts<A, B>(pool: &Pool<A, B>): (u32, bool) {
+        (i32::abs_u32(pool.current_tick), i32::is_neg(pool.current_tick))
+    }
+
+    // ------------------------------------------------------------------ //
     // Swapping                                                           //
     // ------------------------------------------------------------------ //
 

@@ -1,6 +1,11 @@
 {
   "_deployer": "0x1f7994dc670b53f5d2ad39c0d42b9e9645599b7b9b0248d7233c03c1fd871998",
   "_network": "testnet",
+  "_note": "braid_clmm was published twice: the first id lacked the tick-argument wrappers and so could not be called from a PTB. The id recorded here is the live one.",
+  "braid_clmm": {
+    "digest": "6EjtvqFKgXXMjNJcKpyAgFUGW9SQnQiyHY8PC5vfoJJE",
+    "packageId": "0x53b3f796fa2716aee2a1b6a9e61bae58a728b8b0a5dddd10dfe7a7629a187034"
+  },
   "braid_cpmm": {
     "packageId": "0xcaee4def84ca508c1f1e6269847a1b51798b1dfae7d07d1a0fef548676f675a2"
   },
@@ -8,11 +13,9 @@
     "packageId": "0x7bb8f3e41cd60941b0df6fd139d6df65e1dd5128e3b5a9394ad726a4a2b2f72a"
   },
   "braid_stable": {
-    "digest": "FCK9pW6L3rWqBkxgx1pM4qiJ63nmxeAxvHFcxUxdruDv",
     "packageId": "0x9f4d6e25313f06958c36d0291de02e6ca1e3298c634fa35b0e6b47290b13f3b5"
   },
   "braid_test_coins": {
-    "digest": "HGE9UrSuvy6BSY6GAAQ5Uo25Ba7shAQuWXDjkfLRz2jz",
     "packageId": "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699"
   },
   "firstSwap": {
@@ -23,6 +26,28 @@
     "note": "matches stable_math_tests and the Python reference exactly"
   },
   "pools": {
+    "clmm_TUSD_TETH": {
+      "feeBps": 30,
+      "firstSwap": {
+        "amountIn": 100000,
+        "amountOut": 99641,
+        "digest": "4ZB7s5AKpVa2VRcJyhoQzq4M5wNZktb9j3uVT2B74FUD",
+        "feePaid": 300,
+        "tickAfter": -12
+      },
+      "initialSqrtPrice": "18446744073709551616",
+      "poolId": "0x5eb924a166883bc6296c5c9944208541f0c2e88d8831985c99a5afb141586d6c",
+      "position": {
+        "deposited": [
+          5000000,
+          5000000
+        ],
+        "liquidity": 169187499,
+        "tickLower": -600,
+        "tickUpper": 600
+      },
+      "tickSpacing": 60
+    },
     "stable_TUSD_TUSDT": {
       "amp": 10000,
       "createdIn": "F6BGfAssKd6Ce6CJ5wYZY6a54VKs2xEjg4qmM5rYXBNj",
