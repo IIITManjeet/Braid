@@ -1,0 +1,11 @@
+[package]
+name = "braid_clob"
+edition = "2024.beta"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[dependencies]
+braid_math = { local = "../braid_math" }
+
+[addresses]
+braid_clob = "0x0"
