@@ -3,8 +3,11 @@
   "_network": "testnet",
   "_note": "braid_clmm was published twice: the first id lacked the tick-argument wrappers and so could not be called from a PTB. The id recorded here is the live one.",
   "braid_clmm": {
-    "digest": "6EjtvqFKgXXMjNJcKpyAgFUGW9SQnQiyHY8PC5vfoJJE",
     "packageId": "0x53b3f796fa2716aee2a1b6a9e61bae58a728b8b0a5dddd10dfe7a7629a187034"
+  },
+  "braid_clob": {
+    "digest": "HEXFYSu6s51Wwrw4LHPgoph9MVBq16rag6B6MMTLFDbY",
+    "packageId": "0x7fd0dbcf91a111d4a86c50f10aee973085a7ee3aac13f10ad9ec6fe5202bee86"
   },
   "braid_cpmm": {
     "packageId": "0xcaee4def84ca508c1f1e6269847a1b51798b1dfae7d07d1a0fef548676f675a2"
@@ -47,6 +50,70 @@
         "tickUpper": 600
       },
       "tickSpacing": 60
+    },
+    "clob_TETH_TUSD": {
+      "base": "TETH",
+      "createdIn": "CW9jbhnfZkwqD7VD6zUS1gSUaiPonh2TLb6xTvBFu5FK",
+      "firstSwaps": {
+        "baseForQuote": {
+          "amountIn": 1505000,
+          "amountOut": 1498350,
+          "baseSold": 1500000,
+          "change": 5000,
+          "feePaid": 1500,
+          "quoteFilled": 1499850
+        },
+        "digest": "9sP9ou28bWt268K4W8Q5egP9uWVxfxEKjdyUZbFKyRqk",
+        "note": "min_out set to the value predicted from the Move math; both met exactly",
+        "quoteForBase": {
+          "amountIn": 3000000,
+          "amountOut": 2987010,
+          "baseFilled": 2990000,
+          "change": 9305,
+          "feePaid": 2990,
+          "levelsTaken": 2,
+          "quoteSpent": 2990695
+        },
+        "taker": "0x633a98b9d9dad869d29edd98408b2fa2920b5e2dd31abc8babb4eea9d42c73ad"
+      },
+      "lotSize": 10000,
+      "makerWithdrawal": {
+        "base": 1500000,
+        "digest": "Q5sMMRKpLqbJV2eqJNMtWeEEcDwuo8APkputcq3mSsw",
+        "quote": 2990695
+      },
+      "marketCap": "0x60c35da17f968b57845d218bc9d2882277e94e2167798ae30b23b4b81e6f16a7",
+      "marketId": "0x396b0f0c0f36733ea9b3912b11f4037d399a2c117e03acb6106607c859fd1224",
+      "quote": "TUSD",
+      "seed": {
+        "asks": [
+          [
+            1000100000,
+            2000000
+          ],
+          [
+            1000500000,
+            2000000
+          ],
+          [
+            1001000000,
+            2000000
+          ]
+        ],
+        "bids": [
+          [
+            999900000,
+            2000000
+          ],
+          [
+            999500000,
+            2000000
+          ]
+        ]
+      },
+      "seededIn": "DkdSkyhpdXeX3u6dxj6jMsdopPArzFviQH8iPN4i5CHt",
+      "takerFeeBps": 10,
+      "tickSize": 100000
     },
     "stable_TUSD_TUSDT": {
       "amp": 10000,

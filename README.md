@@ -87,8 +87,8 @@ so `braid_math` is published first and the others import it as an on-chain depen
 
 ## Live on Sui testnet
 
-All four packages are published, and the StableSwap pool has been exercised
-end to end with a real swap.
+Every venue package is published, and each venue has been exercised end to
+end with real trades.
 
 | Package | Address |
 |---|---|
@@ -96,6 +96,7 @@ end to end with a real swap.
 | `braid_cpmm` | `0xcaee4def84ca508c1f1e6269847a1b51798b1dfae7d07d1a0fef548676f675a2` |
 | `braid_stable` | `0x9f4d6e25313f06958c36d0291de02e6ca1e3298c634fa35b0e6b47290b13f3b5` |
 | `braid_clmm` | `0x53b3f796fa2716aee2a1b6a9e61bae58a728b8b0a5dddd10dfe7a7629a187034` |
+| `braid_clob` | `0x7fd0dbcf91a111d4a86c50f10aee973085a7ee3aac13f10ad9ec6fe5202bee86` |
 | `braid_test_coins` | `0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699` |
 
 A live TUSD/TUSDT pool at `A = 100`, 4 bps, seeded 1:1 with 1e9 a side:
@@ -117,6 +118,19 @@ A swap through it
 ([`4ZB7s5AK...`](https://suiscan.xyz/testnet/tx/4ZB7s5AKpVa2VRcJyhoQzq4M5wNZktb9j3uVT2B74FUD))
 put 100,000 TUSD in and returned **99,641** TETH for a fee of **300** -- exactly
 30 bps -- moving the price from tick 0 to tick -12.
+
+A live TETH/TUSD order book at a 1 bp tick, 10,000-unit lots and a 10 bp taker
+fee: `0x396b0f0c0f36733ea9b3912b11f4037d399a2c117e03acb6106607c859fd1224`
+
+Seeded with asks at 1.0001 / 1.0005 / 1.0010 and bids at 0.9999 / 0.9995, a
+second address traded both ways in one transaction
+([`9sP9ou28...`](https://suiscan.xyz/testnet/tx/9sP9ou28bWt268K4W8Q5egP9uWVxfxEKjdyUZbFKyRqk)).
+3,000,000 TUSD cleared the first ask level and 99 lots of the second, returning
+**2,987,010** TETH after a 2,990 fee and handing back the 9,305 that could not
+buy a whole lot. 1,505,000 TETH sold 1,500,000 into the top bid for **1,498,350**
+TUSD and returned the 5,000 of dust. Each `min_out` was set to the value
+predicted from the Move math beforehand, so a one-unit shortfall would have
+aborted. Afterwards both vaults held exactly what the remaining orders lock.
 
 Addresses and object ids are recorded in [`deployments/testnet.json`](deployments/testnet.json).
 Redeploy or extend with `bash scripts/deploy.sh`.
@@ -157,6 +171,6 @@ bash scripts/test.sh
 - [x] Deploy to Sui testnet
 - [x] Rust quote engine + differential fuzzer (1,829 generated cases)
 - [x] CLMM: ticks, bitmap, fee growth, swap stepping, pool (125 tests)
-- [x] CLOB: crit-bit tree, matching, custody and settlement (78 tests)
+- [x] CLOB: crit-bit tree, matching, custody and settlement (78 tests), live on testnet
 - [ ] Router
 - [ ] Aptos port

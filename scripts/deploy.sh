@@ -162,6 +162,7 @@ publish braid_math
 publish braid_cpmm
 publish braid_stable
 publish braid_clmm
+publish braid_clob
 publish braid_test_coins
 
 echo "----------------------------------------------------------------"
