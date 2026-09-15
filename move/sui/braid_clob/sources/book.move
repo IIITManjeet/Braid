@@ -23,8 +23,8 @@
 /// # What this module does not do
 ///
 /// It does not hold funds. Matching produces a list of fills and the caller
-/// settles them. Keeping custody out means the matching logic can be tested
-/// without constructing balances.
+/// settles them -- `braid_clob::market` is that caller. Keeping custody out
+/// means the matching logic can be tested without constructing balances.
 ///
 /// `quote` walks the full depth read-only, which the tree's successor
 /// operation makes possible. That is what the router will use to compare this
@@ -154,6 +154,27 @@ module braid_clob::book {
 
     public fun order_owner(book: &Book, id: u64): address {
         table::borrow(&book.orders, id).owner
+    }
+
+    public fun order_price(book: &Book, id: u64): u64 {
+        table::borrow(&book.orders, id).price
+    }
+
+    public fun order_is_bid(book: &Book, id: u64): bool {
+        table::borrow(&book.orders, id).is_bid
+    }
+
+    /// The next price level on a side, moving away from the top of the book:
+    /// downward through bids, upward through asks. `NONE` past the last level.
+    /// `price` need not be a level itself.
+    public fun next_price(book: &Book, price: u64, is_bid: bool): u64 {
+        let leaf = if (is_bid) {
+            critbit::prev_leaf(&book.bids, price)
+        } else {
+            critbit::next_leaf(&book.asks, price)
+        };
+        if (leaf == critbit::none_index()) return NONE;
+        if (is_bid) { critbit::leaf_key(&book.bids, leaf) } else { critbit::leaf_key(&book.asks, leaf) }
     }
 
     public fun fill_price(f: &Fill): u64 { f.price }
