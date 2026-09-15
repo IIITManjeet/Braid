@@ -1,0 +1,64 @@
+{
+  "amount_in": "6000000",
+  "best_single_venue": {
+    "out": "4900358",
+    "venue": "clmm"
+  },
+  "coin_in": "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::tusd::TUSD",
+  "coin_out": "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::teth::TETH",
+  "expected_out": "5975091",
+  "expected_unspent": "0",
+  "legs": [
+    {
+      "amount": "26509",
+      "expected_out": "26290",
+      "expected_spent": "26509",
+      "function": "cpmm_a_to_b",
+      "object": "0xde9420fe79ebfa668aabe6d9a2b64e4dbbdbe0a20f389ba8abada6e9d4a1b56f",
+      "type_args": [
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::tusd::TUSD",
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::teth::TETH"
+      ],
+      "venue": "cpmm"
+    },
+    {
+      "amount": "2180665",
+      "expected_out": "2168303",
+      "expected_spent": "2180665",
+      "function": "stable_a_to_b",
+      "object": "0x45ec372a70c40f0c1fa8890415f8c1ada4e6d91834b33223366cad528b73e0d4",
+      "type_args": [
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::tusd::TUSD",
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::teth::TETH"
+      ],
+      "venue": "stable"
+    },
+    {
+      "amount": "780321",
+      "expected_out": "773508",
+      "expected_spent": "780321",
+      "function": "clmm_a_to_b",
+      "object": "0x5eb924a166883bc6296c5c9944208541f0c2e88d8831985c99a5afb141586d6c",
+      "type_args": [
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::tusd::TUSD",
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::teth::TETH"
+      ],
+      "venue": "clmm"
+    },
+    {
+      "amount": "3012505",
+      "expected_out": "3006990",
+      "expected_spent": "3012505",
+      "function": "clob_quote_to_base",
+      "object": "0x396b0f0c0f36733ea9b3912b11f4037d399a2c117e03acb6106607c859fd1224",
+      "type_args": [
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::teth::TETH",
+        "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::tusd::TUSD"
+      ],
+      "venue": "clob"
+    }
+  ],
+  "min_out": "5975091",
+  "router_package": "0x3cb0239f0af24e7b8a27bedc5ceb010747b4180987e2402a3700b3774d9cf3f3",
+  "slippage_bps": 0
+}

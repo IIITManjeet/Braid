@@ -163,6 +163,8 @@ publish braid_cpmm
 publish braid_stable
 publish braid_clmm
 publish braid_clob
+# Imports all four venues, so it goes after every one of them.
+publish braid_router
 publish braid_test_coins
 
 echo "----------------------------------------------------------------"

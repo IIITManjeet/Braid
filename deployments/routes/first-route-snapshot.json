@@ -1,0 +1,74 @@
+{
+  "router_package": "0x3cb0239f0af24e7b8a27bedc5ceb010747b4180987e2402a3700b3774d9cf3f3",
+  "coin_in": "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::tusd::TUSD",
+  "coin_out": "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699::teth::TETH",
+  "venues": [
+    {
+      "kind": "cpmm",
+      "object": "0xde9420fe79ebfa668aabe6d9a2b64e4dbbdbe0a20f389ba8abada6e9d4a1b56f",
+      "a_to_b": true,
+      "reserve_in": "5000000",
+      "reserve_out": "5000000",
+      "fee_bps": "30"
+    },
+    {
+      "kind": "stable",
+      "object": "0x45ec372a70c40f0c1fa8890415f8c1ada4e6d91834b33223366cad528b73e0d4",
+      "a_to_b": true,
+      "reserve_in": "5000000",
+      "reserve_out": "5000000",
+      "amp": "10000",
+      "fee_bps": "4"
+    },
+    {
+      "kind": "clmm",
+      "object": "0x5eb924a166883bc6296c5c9944208541f0c2e88d8831985c99a5afb141586d6c",
+      "a_to_b": true,
+      "sqrt_price": "18435880048579400799",
+      "tick": -12,
+      "liquidity": "169187499",
+      "fee_bps": "30",
+      "tick_spacing": 60,
+      "ticks": [
+        [
+          600,
+          "169187499",
+          "-169187499"
+        ],
+        [
+          -600,
+          "169187499",
+          "169187499"
+        ]
+      ]
+    },
+    {
+      "kind": "clob",
+      "object": "0x396b0f0c0f36733ea9b3912b11f4037d399a2c117e03acb6106607c859fd1224",
+      "buy_base": true,
+      "tick_size": "100000",
+      "lot_size": "10000",
+      "taker_fee_bps": "10",
+      "asks": [
+        [
+          1000500000,
+          1010000
+        ],
+        [
+          1001000000,
+          2000000
+        ]
+      ],
+      "bids": [
+        [
+          999500000,
+          2000000
+        ],
+        [
+          999900000,
+          500000
+        ]
+      ]
+    }
+  ]
+}

@@ -28,6 +28,29 @@ Then **`braid_router`** splits one order across all four to maximise output. The
 (marginal-price equalisation) runs off-chain in Rust; the chain executes the pre-computed
 route atomically under a slippage bound.
 
+## Routing
+
+```bash
+python scripts/route.py run 6000000      # snapshot -> plan in Rust -> one PTB -> verify
+```
+
+**The split** (`node/crates/braid-route`). Venues do not interact, so a route's output is
+exactly the sum of each venue's replica quote at its own allocation. The optimizer equalises
+marginal output across venues on finite differences -- the curves are integer staircases, the
+book moves in whole lots -- by filling in chunks at the best rate per unit consumed, then
+rebalancing power-of-two transfers down to one unit. Every allocation is trimmed to what its
+venue actually consumes, so a book handing back a partial lot does not make that input look
+worthless. Against exhaustive search it lands within a unit per leg.
+
+**The execution** (`move/sui/braid_router`). A `Route` is a hot potato: no abilities, so a
+PTB that calls `begin` cannot complete without handing it to `finish`, which is where
+`min_out` is enforced on the *total*. Legs pass zero minimums to the venues; a per-leg bound
+would be the wrong check.
+
+**The proof it lines up.** `braid-difftest` plans 25 orders against a Rust copy of the router
+test world and emits Move tests that run each plan through the router at `min_out` equal to
+the predicted output. All 25 pay exactly that.
+
 ## The headline test
 
 A **differential fuzzer**. `node/crates/braid-quote` is a Rust replica of the pricing math --
@@ -84,9 +107,9 @@ move/sui/braid_cpmm/     constant-product pool                                  
 move/sui/braid_stable/   Curve-style stableswap                                     [done]
 move/sui/braid_clmm/     concentrated liquidity                                     [done]
 move/sui/braid_clob/     central limit order book                                   [done]
-move/sui/braid_router/   atomic multi-venue route execution
+move/sui/braid_router/   atomic multi-venue route execution                        [done]
 move/aptos/              phase 2: the port, plus a dialect-comparison writeup
-node/crates/             Rust: braid-quote replica + difftest generator        [in progress]
+node/crates/             Rust: replica, difftest generator, route optimizer         [done]
 bench/                   gas costs per venue, p99 quote latency
 docs/                    design notes, invariant derivations
 ```
@@ -106,6 +129,7 @@ end with real trades.
 | `braid_stable` | `0x9f4d6e25313f06958c36d0291de02e6ca1e3298c634fa35b0e6b47290b13f3b5` |
 | `braid_clmm` | `0x53b3f796fa2716aee2a1b6a9e61bae58a728b8b0a5dddd10dfe7a7629a187034` |
 | `braid_clob` | `0x7fd0dbcf91a111d4a86c50f10aee973085a7ee3aac13f10ad9ec6fe5202bee86` |
+| `braid_router` | `0x3cb0239f0af24e7b8a27bedc5ceb010747b4180987e2402a3700b3774d9cf3f3` |
 | `braid_test_coins` | `0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699` |
 
 A live TUSD/TUSDT pool at `A = 100`, 4 bps, seeded 1:1 with 1e9 a side:
@@ -140,6 +164,25 @@ buy a whole lot. 1,505,000 TETH sold 1,500,000 into the top bid for **1,498,350*
 TUSD and returned the 5,000 of dust. Each `min_out` was set to the value
 predicted from the Move math beforehand, so a one-unit shortfall would have
 aborted. Afterwards both vaults held exactly what the remaining orders lock.
+
+**One order, four venues.** With a CPMM and a StableSwap pool added on the same TUSD/TETH
+pair, 6,000,000 TUSD was routed across all four in one transaction
+([`38A5UsC4...`](https://suiscan.xyz/testnet/tx/38A5UsC44db3cfogzznA6d6y5bx6QuKnU5jXcMZqahJs)),
+with `min_out` set to exactly the planned output:
+
+| Venue | In | Out |
+|---|---|---|
+| CPMM | 26,509 | 26,290 |
+| StableSwap | 2,180,665 | 2,168,303 |
+| CLMM | 780,321 | 773,508 |
+| CLOB | 3,012,505 | 3,006,990 |
+| **Total** | **6,000,000** | **5,975,091** |
+
+Every leg's on-chain event matched the Rust plan to the unit. The best venue that could take
+the whole order alone, the stable pool, pays 4,899,130 -- the split returns 22% more, a figure
+that says as much about how shallow these testnet pools are (5M a side) as about the router.
+The snapshot and plan are committed under [`deployments/routes/`](deployments/routes), and
+re-planning that snapshot reproduces the executed plan exactly.
 
 Addresses and object ids are recorded in [`deployments/testnet.json`](deployments/testnet.json).
 Redeploy or extend with `bash scripts/deploy.sh`.
@@ -181,5 +224,5 @@ bash scripts/test.sh
 - [x] Rust quote engine + differential fuzzer (1,829 generated cases)
 - [x] CLMM: ticks, bitmap, fee growth, swap stepping, pool (125 tests)
 - [x] CLOB: crit-bit tree, matching, custody and settlement (78 tests), live on testnet
-- [ ] Router
+- [x] Router: hot-potato route, Rust optimizer, CLMM and CLOB replicas, live four-venue route
 - [ ] Aptos port

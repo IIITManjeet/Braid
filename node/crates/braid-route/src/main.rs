@@ -50,11 +50,28 @@ fn main() -> ExitCode {
         let (out, spent) = venue.quote(amount_in);
         println!("  all-in {:<8} out {out:>14}  spent {spent:>14}", snapshot.refs[i].kind);
     }
-    if let Some((_, single)) = plan.best_single {
-        if single > 0 {
+    // Compare only against venues that take the whole order. One that runs
+    // out of depth pays less *and* hands input back, and setting the split's
+    // output against its output alone would flatter the split.
+    let filling = snapshot
+        .venues
+        .iter()
+        .enumerate()
+        .map(|(i, v)| (i, v.quote(amount_in)))
+        .filter(|&(_, (_, spent))| spent == amount_in)
+        .max_by_key(|&(_, (out, _))| out);
+    match filling {
+        Some((i, (single, _))) if single > 0 && plan.unspent == 0 => {
             let gain = plan.total_out as f64 / single as f64 - 1.0;
-            println!("split vs best single venue: +{} ({:+.3}%)", plan.total_out - single, gain * 100.0);
+            println!(
+                "split vs best venue that fills the whole order ({}): +{} ({:+.3}%)",
+                snapshot.refs[i].kind,
+                plan.total_out - single,
+                gain * 100.0
+            );
         }
+        Some(_) => println!("the split leaves input unspent; no like-for-like single-venue comparison"),
+        None => println!("no single venue can fill the whole order"),
     }
 
     if let Some(path) = args.get(3) {

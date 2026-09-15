@@ -6,7 +6,6 @@
     "packageId": "0x53b3f796fa2716aee2a1b6a9e61bae58a728b8b0a5dddd10dfe7a7629a187034"
   },
   "braid_clob": {
-    "digest": "HEXFYSu6s51Wwrw4LHPgoph9MVBq16rag6B6MMTLFDbY",
     "packageId": "0x7fd0dbcf91a111d4a86c50f10aee973085a7ee3aac13f10ad9ec6fe5202bee86"
   },
   "braid_cpmm": {
@@ -15,11 +14,49 @@
   "braid_math": {
     "packageId": "0x7bb8f3e41cd60941b0df6fd139d6df65e1dd5128e3b5a9394ad726a4a2b2f72a"
   },
+  "braid_router": {
+    "digest": "GUMbQznQdvojQAqvrUkhdXLan6Y6V5VjMKYb4P96tzQr",
+    "packageId": "0x3cb0239f0af24e7b8a27bedc5ceb010747b4180987e2402a3700b3774d9cf3f3"
+  },
   "braid_stable": {
     "packageId": "0x9f4d6e25313f06958c36d0291de02e6ca1e3298c634fa35b0e6b47290b13f3b5"
   },
   "braid_test_coins": {
     "packageId": "0x0e9be022ce9a17e896329ea6550698c1394b2d46e20c9d7a11ef27e7b3555699"
+  },
+  "firstRoute": {
+    "amountIn": 6000000,
+    "amountOut": 5975091,
+    "bestVenueFillingWholeOrder": {
+      "out": 4899130,
+      "venue": "stable"
+    },
+    "coinIn": "TUSD",
+    "coinOut": "TETH",
+    "digest": "38A5UsC44db3cfogzznA6d6y5bx6QuKnU5jXcMZqahJs",
+    "legs": {
+      "clmm": {
+        "in": 780321,
+        "out": 773508
+      },
+      "clob": {
+        "in": 3012505,
+        "out": 3006990
+      },
+      "cpmm": {
+        "in": 26509,
+        "out": 26290
+      },
+      "stable": {
+        "in": 2180665,
+        "out": 2168303
+      }
+    },
+    "minOut": 5975091,
+    "note": "min_out was set to exactly the planned output; every leg's LegExecuted event matched the Rust plan to the unit",
+    "plan": "deployments/routes/first-route-plan.json",
+    "sender": "0x633a98b9d9dad869d29edd98408b2fa2920b5e2dd31abc8babb4eea9d42c73ad",
+    "snapshot": "deployments/routes/first-route-snapshot.json"
   },
   "firstSwap": {
     "amountIn": 1000000,
@@ -114,6 +151,26 @@
       "seededIn": "DkdSkyhpdXeX3u6dxj6jMsdopPArzFviQH8iPN4i5CHt",
       "takerFeeBps": 10,
       "tickSize": 100000
+    },
+    "cpmm_TUSD_TETH": {
+      "createdIn": "FA6CZUNt5YPogZW6yca2TFhLPHGdwzivDm76MCoz1oHN",
+      "feeBps": 30,
+      "poolId": "0xde9420fe79ebfa668aabe6d9a2b64e4dbbdbe0a20f389ba8abada6e9d4a1b56f",
+      "seededWith": [
+        5000000,
+        5000000
+      ]
+    },
+    "stable_TUSD_TETH": {
+      "amp": 10000,
+      "createdIn": "FA6CZUNt5YPogZW6yca2TFhLPHGdwzivDm76MCoz1oHN",
+      "feeBps": 4,
+      "note": "A deliberately unpegged pair for a stable pool: it exists so all four venues quote the same TUSD/TETH pair for the router",
+      "poolId": "0x45ec372a70c40f0c1fa8890415f8c1ada4e6d91834b33223366cad528b73e0d4",
+      "seededWith": [
+        5000000,
+        5000000
+      ]
     },
     "stable_TUSD_TUSDT": {
       "amp": 10000,
