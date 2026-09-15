@@ -37,7 +37,14 @@ does the Rust. Floor division does not reassociate, so operation order is part o
 
 `braid-difftest` generates random pool states and trades, computes each answer with the
 replica, and emits them as Move test files. `sui move test` then runs every case through the
-real Move VM. **1,829 cases; a one-unit disagreement fails the build.**
+real Move VM. **A one-unit disagreement fails the build.** It covers every venue:
+
+| Venue | Generated cases |
+|---|---|
+| CPMM | 742 formula checks |
+| StableSwap | 1,087 formula checks |
+| CLMM | 1,200 formula checks, plus 100 whole-pool scenarios -- random positions, then swaps across initialized ticks and empty bitmap words |
+| CLOB | 50 order-book scenarios -- random books, quoted then executed in both directions |
 
 The generated files are committed on purpose. The RNG is seeded, so regenerating produces an
 identical file unless a *value* moved -- and then the diff names the case and the delta. A
@@ -58,8 +65,10 @@ agree and both be wrong. That is covered separately -- hand-derived fixtures, th
 properties (`k` and `D` never decrease), and for StableSwap a third implementation in Python
 written from Curve's published reference rather than from this code.
 
-The harness is verified against a negative control: flipping one `mul_div_floor` to
-`mul_div_ceil` in the replica fails the generated suite immediately.
+The harness is verified against negative controls: flipping one `mul_div_floor` to
+`mul_div_ceil` in the replica fails the generated suite immediately, and letting the CLMM
+replica skip empty bitmap-word boundaries -- walking a sorted tick list, as a natural
+reimplementation would -- fails 58 of the 100 pool scenarios.
 
 **Not yet wired:** reading return values back from the deployed bytecode. `sui client
 --dev-inspect` on CLI 1.78 renders a dry run without return values, and the GraphQL
