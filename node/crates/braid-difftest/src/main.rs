@@ -528,6 +528,53 @@ fn gen_clob(rng: &mut Rng, n: usize) -> String {
     out
 }
 
+// ---------------------------------------------------------------------------
+// Routes
+// ---------------------------------------------------------------------------
+//
+// The end of the chain: the optimizer plans against the Rust copy of the
+// router test world, and the plan runs through `braid_router` on the Move one
+// with `min_out` set to exactly what the plan predicts. A route that pays one
+// unit less aborts; one that pays more fails the equality check.
+
+fn gen_routes(rng: &mut Rng, n: usize) -> String {
+    let mut out = header(
+        "braid_router::generated_route_diff_tests",
+        "    use braid_router::test_world;\n",
+    );
+    let venues = braid_route::fixtures::router_test_world();
+
+    // Sizes spanning dust to several times the world's depth, plus the
+    // hand-split case from route_tests.
+    let mut amounts = vec![8_000_000u64];
+    while amounts.len() < n {
+        amounts.push(rng.magnitude(4, 7));
+    }
+
+    for (index, amount) in amounts.into_iter().enumerate() {
+        let plan = braid_route::optimize(&venues, amount);
+        let mut alloc = [0u64; 4];
+        for leg in &plan.legs {
+            alloc[leg.venue] = leg.amount;
+        }
+        let _ = writeln!(
+            out,
+            "\n    #[test]\n    fun optimized_route_{index}() {{\n        \
+                 // {amount} in: cpmm {}, stable {}, clmm {}, clob {}\n        \
+                 let (got, unspent) = test_world::buy_eth({}, {amount}, vector[{}, {}, {}, {}], {});\n        \
+                 assert!(got == {} && unspent == {}, 0);\n    }}",
+            alloc[0], alloc[1], alloc[2], alloc[3],
+            0,
+            alloc[0], alloc[1], alloc[2], alloc[3],
+            plan.total_out,
+            plan.total_out,
+            plan.unspent,
+        );
+    }
+    out.push_str("}\n");
+    out
+}
+
 fn write(path: &str, contents: &str) {
     let p = Path::new(path);
     if let Some(dir) = p.parent() {
@@ -552,6 +599,7 @@ fn main() {
     let mut rng_clmm = Rng(SEED ^ 0xC1_4411_u64);
     let mut rng_pools = Rng(SEED ^ 0x9001_5EED_u64);
     let mut rng_clob = Rng(SEED ^ 0xC10B_u64);
+    let mut rng_routes = Rng(SEED ^ 0x2007E_u64);
 
     write(
         "../move/sui/braid_cpmm/tests/generated_diff_tests.move",
@@ -573,6 +621,10 @@ fn main() {
     write(
         "../move/sui/braid_clob/tests/generated_market_diff_tests.move",
         &gen_clob(&mut rng_clob, n / 8),
+    );
+    write(
+        "../move/sui/braid_router/tests/generated_route_diff_tests.move",
+        &gen_routes(&mut rng_routes, n / 16),
     );
 
     println!("\nNow run:  bash scripts/test.sh");

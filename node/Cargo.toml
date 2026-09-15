@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/braid-quote", "crates/braid-difftest"]
+members = ["crates/braid-quote", "crates/braid-difftest", "crates/braid-route"]
 
 [workspace.package]
 edition = "2024"

@@ -1,9 +1,11 @@
 [package]
-name = "braid-difftest"
+name = "braid-route"
 edition.workspace = true
 version.workspace = true
 license.workspace = true
 
 [dependencies]
 braid-quote = { path = "../braid-quote" }
-braid-route = { path = "../braid-route" }
+# The snapshot a route is planned against, and the plan handed to execution.
+serde_json = "1"
+ethnum.workspace = true
