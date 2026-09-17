@@ -108,7 +108,9 @@ move/sui/braid_stable/   Curve-style stableswap                                 
 move/sui/braid_clmm/     concentrated liquidity                                     [done]
 move/sui/braid_clob/     central limit order book                                   [done]
 move/sui/braid_router/   atomic multi-venue route execution                        [done]
-move/aptos/              phase 2: the port, plus a dialect-comparison writeup
+move/aptos/braid_math/   phase 2: the Aptos port                                   [done]
+move/aptos/braid_cpmm/   phase 2: the Aptos port                                   [done]
+move/aptos/braid_stable/ phase 2: the Aptos port                                   [done]
 node/crates/             Rust: replica, difftest generator, route optimizer         [done]
 bench/                   gas costs per venue, p99 quote latency
 docs/                    design notes, invariant derivations
@@ -187,8 +189,51 @@ re-planning that snapshot reproduces the executed plan exactly.
 Addresses and object ids are recorded in [`deployments/testnet.json`](deployments/testnet.json).
 Redeploy or extend with `bash scripts/deploy.sh`.
 
+## The Aptos port
+
+The same exchange, on the other Move chain. `braid_math`, `braid_cpmm` and
+`braid_stable` are live under `move/aptos/` and their suites are green: **162
+tests on Sui, 163 on Aptos.**
+
+The pricing math is the *same code* -- `cpmm_math.move` and `stable_math.move`
+differ only by `let mut` becoming `let`, because Aptos Move has no `mut` on
+locals. Better, the generated differential-fuzz corpora are byte-identical files:
+
+```bash
+diff move/sui/braid_cpmm/tests/generated_diff_tests.move \
+     move/aptos/braid_cpmm/tests/generated_diff_tests.move   # empty
+```
+
+So the 1,829 cases the Rust replica produced now run against two independent
+Move VMs and agree with both to the unit. A replica that matches one
+implementation might have copied its bug; one that matches two is describing the
+arithmetic.
+
+`pool.move` is not a transliteration, and that is where the writeup lives. Sui
+passes a shared object as `&mut Pool<A, B>`; Aptos keeps resources in global
+storage, so the pool arrives as an `address` and the module must check it exists
+-- which is the entire 162-vs-163 test difference, one test named
+`a_swap_against_an_address_holding_no_pool_aborts`. Sui's LP token is its own
+minting witness via `balance::create_supply`; Aptos's `coin::initialize` demands
+a signer for the address that *declares* the type, so LP is a fungible asset
+whose `MintRef` lives inside the pool and pool creation stays permissionless.
+And Aptos's `FungibleAsset` has no abilities at all -- it is a hot potato, the
+same trick `braid_router` uses for `Route`.
+
+The StableSwap pool still returns **999,590** for 1,000,000 in: the number the
+live Sui testnet swap below produced. Four implementations agree on it now.
+
+```bash
+bash scripts/get-aptos.sh      # vendors the Aptos CLI into .tools/
+bash scripts/test-aptos.sh
+```
+
+Full comparison: [docs/aptos-port.md](docs/aptos-port.md).
+
 ## Notes from the build
 
+- [Porting to Aptos Move](docs/aptos-port.md) -- what the dialect forces, and
+  where the two chains genuinely disagree about what a program is.
 - [When Newton-Raphson never converges](docs/stableswap-limit-cycles.md) --
   the StableSwap `D` solver has states where it orbits forever instead of
   converging, and Curve's own implementation reverts on them. What causes it,
@@ -201,16 +246,23 @@ The Sui CLI is vendored into `.tools/` rather than installed globally, and is **
 
 ```bash
 bash scripts/get-sui.sh
+bash scripts/get-aptos.sh       # only needed for move/aptos
 export PATH="$PWD/.tools:$PATH"
-sui --version
+sui --version && aptos --version
 ```
 
-Also required: Rust (1.96+) and Node 18+. Aptos CLI is only needed for phase 2.
+Both CLIs pin an exact version, and on the Aptos side the framework `rev` in
+each `Move.toml` is pinned to the tag that CLI was cut from — `aptos-core` ships
+the compiler and the framework together, so a newer framework fails to parse on
+an older compiler. Bump them as a pair.
+
+Also required: Rust (1.96+) and Node 18+.
 
 Every package's tests, in one go:
 
 ```bash
-bash scripts/test.sh
+bash scripts/test.sh            # Sui: 570 Move tests, plus the Rust replica
+bash scripts/test-aptos.sh      # Aptos: 163 Move tests
 ```
 
 ## Status
@@ -225,4 +277,6 @@ bash scripts/test.sh
 - [x] CLMM: ticks, bitmap, fee growth, swap stepping, pool (125 tests)
 - [x] CLOB: crit-bit tree, matching, custody and settlement (78 tests), live on testnet
 - [x] Router: hot-potato route, Rust optimizer, CLMM and CLOB replicas, live four-venue route
-- [ ] Aptos port
+- [x] Aptos port: `braid_math`, `braid_cpmm`, `braid_stable` (163 tests), dialect writeup
+- [ ] Aptos port: `braid_clmm`, `braid_clob`, `braid_router`
+- [ ] Deploy the Aptos packages to testnet
