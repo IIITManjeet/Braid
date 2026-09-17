@@ -1,0 +1,20 @@
+[package]
+name = "braid_clob"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[addresses]
+braid_clob = "_"
+
+# Distinct values per named address -- see the note in braid_cpmm/Move.toml.
+[dev-addresses]
+braid_clob = "0xC10B"
+braid_math = "0xB4A1D"
+
+[dependencies]
+braid_math = { local = "../braid_math" }
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+subdir = "aptos-move/framework/aptos-framework"
+rev = "aptos-cli-v7.2.0"
