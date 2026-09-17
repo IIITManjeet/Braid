@@ -71,6 +71,23 @@ impl Rng {
     }
 }
 
+/// Which Move dialect a generated file targets.
+///
+/// Only the two whole-scenario generators need this. The formula suites are
+/// already dialect-neutral -- they call pure functions with integer arguments
+/// and nothing else -- so the same string is written to both trees, and
+/// `diff` between them stays empty on purpose.
+///
+/// Both dialects are rendered from separately seeded but identical RNG streams,
+/// so case `n` in the Sui file and case `n` in the Aptos file are the same pool
+/// and the same trades. That is what makes the pair meaningful: a disagreement
+/// is between the two VMs, not between two different random worlds.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Dialect {
+    Sui,
+    Aptos,
+}
+
 fn header(module: &str, uses: &str) -> String {
     format!(
         "#[test_only]\n\
@@ -297,7 +314,95 @@ fn gen_clmm_math(rng: &mut Rng, n: usize) -> String {
 // test runtime keeps dynamic fields across scenarios within one function and
 // a second pool would inherit the first one's table ids.
 
-fn gen_clmm_pools(rng: &mut Rng, n: usize) -> String {
+/// The Aptos prologue for the pool scenarios.
+///
+/// Longer than the Sui one for two reasons that have nothing to do with the
+/// pricing: an Aptos coin is a registered type, so the fixture has to hold real
+/// mint and burn capabilities rather than call `coin::mint_for_testing`; and
+/// `add_liquidity_at` is an entry function that moves coins through the
+/// caller's account, so the helper rebuilds the `I32` ticks and calls the
+/// value-taking `add_liquidity` instead.
+const APTOS_POOL_PRELUDE: &str = "    use aptos_framework::account;\n    \
+     use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability};\n    \
+     use braid_clmm::i32::{Self, I32};\n    \
+     use braid_clmm::pool;\n\n    \
+     struct A {}\n    \
+     struct B {}\n\n    \
+     struct Caps has key {\n        \
+         a_mint: MintCapability<A>,\n        \
+         a_burn: BurnCapability<A>,\n        \
+         b_mint: MintCapability<B>,\n        \
+         b_burn: BurnCapability<B>,\n    \
+     }\n\n    \
+     fun setup() {\n        \
+         account::create_account_for_test(@aptos_framework);\n        \
+         let braid = account::create_account_for_test(@braid_clmm);\n        \
+         account::create_account_for_test(@0xA);\n        \
+         let (ab, af, am) = coin::initialize<A>(\n            \
+             &braid, std::string::utf8(b\"A\"), std::string::utf8(b\"A\"), 8, false);\n        \
+         let (bb, bf, bm) = coin::initialize<B>(\n            \
+             &braid, std::string::utf8(b\"B\"), std::string::utf8(b\"B\"), 8, false);\n        \
+         coin::destroy_freeze_cap(af);\n        \
+         coin::destroy_freeze_cap(bf);\n        \
+         move_to(&braid, Caps { a_mint: am, a_burn: ab, b_mint: bm, b_burn: bb });\n    \
+     }\n\n    \
+     fun lp(): signer { account::create_signer_for_test(@0xA) }\n\n    \
+     fun mint_a(v: u64): Coin<A> acquires Caps {\n        \
+         coin::mint<A>(v, &borrow_global<Caps>(@braid_clmm).a_mint)\n    \
+     }\n\n    \
+     fun mint_b(v: u64): Coin<B> acquires Caps {\n        \
+         coin::mint<B>(v, &borrow_global<Caps>(@braid_clmm).b_mint)\n    \
+     }\n\n    \
+     fun burn_a(c: Coin<A>) acquires Caps {\n        \
+         coin::burn<A>(c, &borrow_global<Caps>(@braid_clmm).a_burn)\n    \
+     }\n\n    \
+     fun burn_b(c: Coin<B>) acquires Caps {\n        \
+         coin::burn<B>(c, &borrow_global<Caps>(@braid_clmm).b_burn)\n    \
+     }\n\n    \
+     fun tick_of(magnitude: u32, is_negative: bool): I32 {\n        \
+         if (is_negative) { i32::neg_from(magnitude) } else { i32::from_u32(magnitude) }\n    \
+     }\n\n    \
+     fun add(p: address, lm: u32, ln: bool, um: u32, un: bool, a0: u64, a1: u64, c0: u64, c1: u64) acquires Caps {\n        \
+         let ca = mint_a(a0);\n        \
+         let cb = mint_b(a1);\n        \
+         let (ra, rb) = pool::add_liquidity<A, B>(&lp(), p, tick_of(lm, ln), tick_of(um, un), ca, cb);\n        \
+         assert!(coin::value(&ra) == c0 && coin::value(&rb) == c1, 100);\n        \
+         burn_a(ra);\n        \
+         burn_b(rb);\n    \
+     }\n\n    \
+     fun swap(p: address, a_to_b: bool, amount: u64, limit: u128, want_out: u64, want_change: u64) acquires Caps {\n        \
+         if (a_to_b) {\n            \
+             let c = mint_a(amount);\n            \
+             let (o, ch) = pool::swap_a_for_b<A, B>(p, c, 0, limit);\n            \
+             assert!(coin::value(&o) == want_out, 101);\n            \
+             assert!(coin::value(&ch) == want_change, 102);\n            \
+             burn_b(o);\n            \
+             burn_a(ch);\n        \
+         } else {\n            \
+             let c = mint_b(amount);\n            \
+             let (o, ch) = pool::swap_b_for_a<A, B>(p, c, 0, limit);\n            \
+             assert!(coin::value(&o) == want_out, 101);\n            \
+             assert!(coin::value(&ch) == want_change, 102);\n            \
+             burn_a(o);\n            \
+             burn_b(ch);\n        \
+         }\n    \
+     }\n";
+
+fn gen_clmm_pools(rng: &mut Rng, n: usize, dialect: Dialect) -> String {
+    if dialect == Dialect::Aptos {
+        let mut out = header("braid_clmm::generated_pool_diff_tests", APTOS_POOL_PRELUDE);
+        let mut made = 0;
+        let mut guard = 0;
+        while made < n && guard < n * 50 {
+            guard += 1;
+            if let Some(body) = clmm_case(rng, made, dialect) {
+                out.push_str(&body);
+                made += 1;
+            }
+        }
+        out.push_str("}\n");
+        return out;
+    }
     let mut out = header(
         "braid_clmm::generated_pool_diff_tests",
         "    use sui::coin;\n    \
@@ -337,7 +442,7 @@ fn gen_clmm_pools(rng: &mut Rng, n: usize) -> String {
     let mut guard = 0;
     while made < n && guard < n * 50 {
         guard += 1;
-        if let Some(body) = clmm_case(rng, made) {
+        if let Some(body) = clmm_case(rng, made, dialect) {
             out.push_str(&body);
             made += 1;
         }
@@ -348,7 +453,7 @@ fn gen_clmm_pools(rng: &mut Rng, n: usize) -> String {
 
 /// One pool scenario, or `None` if the replica rejects any step of it -- the
 /// generator only emits cases the chain is expected to accept.
-fn clmm_case(rng: &mut Rng, index: usize) -> Option<String> {
+fn clmm_case(rng: &mut Rng, index: usize, dialect: Dialect) -> Option<String> {
     let spacing = [1u32, 10, 60, 200][rng.range(0, 3) as usize];
     let fee = [0u64, 5, 30, 100][rng.range(0, 3) as usize];
 
@@ -361,13 +466,20 @@ fn clmm_case(rng: &mut Rng, index: usize) -> Option<String> {
     let hi = clmm::sqrt_price_at_tick(start_tick + 1).ok()?;
     let sqrt_price = if rng.range(0, 2) == 0 { lo } else { lo + (rng.next() as u128) % (hi - lo) };
 
+    let aptos = dialect == Dialect::Aptos;
     let mut pool = clmm::Pool::new(sqrt_price, fee, spacing).ok()?;
     let mut body = String::new();
-    let _ = writeln!(body, "\n    #[test]\n    fun pool_case_{index}() {{");
-    let _ = writeln!(body, "        let mut sc = ts::begin(@0xA);");
-    let _ = writeln!(body, "        pool::create_pool<A, B>({sqrt_price}, {fee}, {spacing}, sc.ctx());");
-    let _ = writeln!(body, "        sc.next_tx(@0xA);");
-    let _ = writeln!(body, "        let mut p = sc.take_shared<Pool<A, B>>();");
+    if aptos {
+        let _ = writeln!(body, "\n    #[test]\n    fun pool_case_{index}() acquires Caps {{");
+        let _ = writeln!(body, "        setup();");
+        let _ = writeln!(body, "        let p = pool::create_pool<A, B>({sqrt_price}, {fee}, {spacing});");
+    } else {
+        let _ = writeln!(body, "\n    #[test]\n    fun pool_case_{index}() {{");
+        let _ = writeln!(body, "        let mut sc = ts::begin(@0xA);");
+        let _ = writeln!(body, "        pool::create_pool<A, B>({sqrt_price}, {fee}, {spacing}, sc.ctx());");
+        let _ = writeln!(body, "        sc.next_tx(@0xA);");
+        let _ = writeln!(body, "        let mut p = sc.take_shared<Pool<A, B>>();");
+    }
 
     // Ranges wide enough, in words, that swaps cross empty word boundaries as
     // well as initialized ticks. A word is 256 * spacing ticks.
@@ -381,9 +493,10 @@ fn clmm_case(rng: &mut Rng, index: usize) -> Option<String> {
         let a0 = rng.magnitude(3, 15);
         let a1 = rng.magnitude(3, 15);
         let (_, need0, need1) = pool.add_liquidity(lower, upper, a0, a1).ok()?;
+        let recv = if aptos { "p" } else { "&mut sc, &mut p" };
         let _ = writeln!(
             body,
-            "        add(&mut sc, &mut p, {}, {}, {}, {}, {a0}, {a1}, {}, {});",
+            "        add({recv}, {}, {}, {}, {}, {a0}, {a1}, {}, {});",
             lower.unsigned_abs(),
             lower < 0,
             upper.unsigned_abs(),
@@ -392,7 +505,8 @@ fn clmm_case(rng: &mut Rng, index: usize) -> Option<String> {
             a1 - need1,
         );
     }
-    let _ = writeln!(body, "        assert!(pool::liquidity(&p) == {}, 0);", pool.liquidity);
+    let read = if aptos { "<A, B>(p)" } else { "(&p)" };
+    let _ = writeln!(body, "        assert!(pool::liquidity{read} == {}, 0);", pool.liquidity);
 
     for _ in 0..rng.range(1, 3) {
         let a_to_b = rng.range(0, 1) == 0;
@@ -411,17 +525,22 @@ fn clmm_case(rng: &mut Rng, index: usize) -> Option<String> {
             clmm::MAX_SQRT_PRICE
         };
         let (spent, got) = pool.swap(amount, a_to_b, limit).ok()?;
+        let recv = if aptos { "p" } else { "&mut sc, &mut p" };
         let _ = writeln!(
             body,
-            "        swap(&mut sc, &mut p, {a_to_b}, {amount}, {limit}, {got}, {});",
+            "        swap({recv}, {a_to_b}, {amount}, {limit}, {got}, {});",
             amount - spent
         );
     }
 
-    let _ = writeln!(body, "        assert!(pool::sqrt_price(&p) == {}, 1);", pool.sqrt_price);
-    let _ = writeln!(body, "        assert!(i32::bits(pool::current_tick(&p)) == {}, 2);", pool.tick as u32);
-    let _ = writeln!(body, "        assert!(pool::liquidity(&p) == {}, 3);", pool.liquidity);
-    let _ = writeln!(body, "        ts::return_shared(p);\n        sc.end();\n    }}");
+    let _ = writeln!(body, "        assert!(pool::sqrt_price{read} == {}, 1);", pool.sqrt_price);
+    let _ = writeln!(body, "        assert!(i32::bits(pool::current_tick{read}) == {}, 2);", pool.tick as u32);
+    let _ = writeln!(body, "        assert!(pool::liquidity{read} == {}, 3);", pool.liquidity);
+    if aptos {
+        let _ = writeln!(body, "    }}");
+    } else {
+        let _ = writeln!(body, "        ts::return_shared(p);\n        sc.end();\n    }}");
+    }
     Some(body)
 }
 
@@ -429,9 +548,67 @@ fn clmm_case(rng: &mut Rng, index: usize) -> Option<String> {
 // The order book
 // ---------------------------------------------------------------------------
 
-fn gen_clob(rng: &mut Rng, n: usize) -> String {
+/// The Aptos prologue for the market scenarios. Same shape as the pool one,
+/// and the same two reasons for the extra length.
+const APTOS_MARKET_PRELUDE: &str = "    use aptos_framework::account;\n    \
+     use aptos_framework::coin::{Self, Coin, MintCapability, BurnCapability};\n    \
+     use braid_clob::book;\n    \
+     use braid_clob::market;\n\n    \
+     struct BASE {}\n    \
+     struct QUOTE {}\n\n    \
+     const MAKER: address = @0xA;\n    \
+     const TAKER: address = @0xB;\n\n    \
+     struct Caps has key {\n        \
+         base_mint: MintCapability<BASE>,\n        \
+         base_burn: BurnCapability<BASE>,\n        \
+         quote_mint: MintCapability<QUOTE>,\n        \
+         quote_burn: BurnCapability<QUOTE>,\n    \
+     }\n\n    \
+     fun setup() {\n        \
+         account::create_account_for_test(@aptos_framework);\n        \
+         let braid = account::create_account_for_test(@braid_clob);\n        \
+         account::create_account_for_test(MAKER);\n        \
+         account::create_account_for_test(TAKER);\n        \
+         let (bb, bf, bm) = coin::initialize<BASE>(\n            \
+             &braid, std::string::utf8(b\"BASE\"), std::string::utf8(b\"BASE\"), 8, false);\n        \
+         let (qb, qf, qm) = coin::initialize<QUOTE>(\n            \
+             &braid, std::string::utf8(b\"QUOTE\"), std::string::utf8(b\"QUOTE\"), 8, false);\n        \
+         coin::destroy_freeze_cap(bf);\n        \
+         coin::destroy_freeze_cap(qf);\n        \
+         move_to(&braid, Caps { base_mint: bm, base_burn: bb, quote_mint: qm, quote_burn: qb });\n    \
+     }\n\n    \
+     fun signs(who: address): signer { account::create_signer_for_test(who) }\n\n    \
+     fun mint_base(v: u64): Coin<BASE> acquires Caps {\n        \
+         coin::mint<BASE>(v, &borrow_global<Caps>(@braid_clob).base_mint)\n    \
+     }\n\n    \
+     fun mint_quote(v: u64): Coin<QUOTE> acquires Caps {\n        \
+         coin::mint<QUOTE>(v, &borrow_global<Caps>(@braid_clob).quote_mint)\n    \
+     }\n\n    \
+     fun burn_base(c: Coin<BASE>) acquires Caps {\n        \
+         coin::burn<BASE>(c, &borrow_global<Caps>(@braid_clob).base_burn)\n    \
+     }\n\n    \
+     fun burn_quote(c: Coin<QUOTE>) acquires Caps {\n        \
+         coin::burn<QUOTE>(c, &borrow_global<Caps>(@braid_clob).quote_burn)\n    \
+     }\n\n    \
+     fun rest(m: address, price: u64, qty: u64, is_bid: bool) acquires Caps {\n        \
+         if (is_bid) {\n            \
+             let pay = mint_quote(18446744073709551615);\n            \
+             let (o, ch, _) = market::place_bid<BASE, QUOTE>(&signs(MAKER), m, price, qty, book::gtc(), pay);\n            \
+             burn_base(o);\n            \
+             burn_quote(ch);\n        \
+         } else {\n            \
+             let pay = mint_base(qty);\n            \
+             let (o, ch, _) = market::place_ask<BASE, QUOTE>(&signs(MAKER), m, price, qty, book::gtc(), pay);\n            \
+             burn_quote(o);\n            \
+             burn_base(ch);\n        \
+         }\n    \
+     }\n";
+
+fn gen_clob(rng: &mut Rng, n: usize, dialect: Dialect) -> String {
+    let aptos = dialect == Dialect::Aptos;
     let mut out = header(
         "braid_clob::generated_market_diff_tests",
+        if aptos { APTOS_MARKET_PRELUDE } else {
         "    use sui::coin;\n    \
              use sui::test_scenario::{Self as ts, Scenario};\n    \
              use braid_clob::book;\n    \
@@ -452,7 +629,7 @@ fn gen_clob(rng: &mut Rng, n: usize) -> String {
                      coin::burn_for_testing(o);\n            \
                      coin::burn_for_testing(ch);\n        \
                  }\n    \
-             }\n",
+             }\n" },
     );
 
     for index in 0..n {
@@ -465,15 +642,25 @@ fn gen_clob(rng: &mut Rng, n: usize) -> String {
         let mut book = clob::Book::new(tick, lot, fee);
 
         let mut body = String::new();
-        let _ = writeln!(body, "\n    #[test]\n    fun market_case_{index}() {{");
-        let _ = writeln!(body, "        let mut sc = ts::begin(MAKER);");
-        let _ = writeln!(
-            body,
-            "        let cap = market::create_market<BASE, QUOTE>({tick}, {lot}, {fee}, sc.ctx());"
-        );
-        let _ = writeln!(body, "        transfer::public_transfer(cap, MAKER);");
-        let _ = writeln!(body, "        sc.next_tx(MAKER);");
-        let _ = writeln!(body, "        let mut m = sc.take_shared<Market<BASE, QUOTE>>();");
+        if aptos {
+            let _ = writeln!(body, "\n    #[test]\n    fun market_case_{index}() acquires Caps {{");
+            let _ = writeln!(body, "        setup();");
+            let _ = writeln!(
+                body,
+                "        let (m, cap) = market::create_market<BASE, QUOTE>({tick}, {lot}, {fee});"
+            );
+            let _ = writeln!(body, "        market::store_cap(&signs(MAKER), cap);");
+        } else {
+            let _ = writeln!(body, "\n    #[test]\n    fun market_case_{index}() {{");
+            let _ = writeln!(body, "        let mut sc = ts::begin(MAKER);");
+            let _ = writeln!(
+                body,
+                "        let cap = market::create_market<BASE, QUOTE>({tick}, {lot}, {fee}, sc.ctx());"
+            );
+            let _ = writeln!(body, "        transfer::public_transfer(cap, MAKER);");
+            let _ = writeln!(body, "        sc.next_tx(MAKER);");
+            let _ = writeln!(body, "        let mut m = sc.take_shared<Market<BASE, QUOTE>>();");
+        }
 
         for _ in 0..rng.range(1, 12) {
             let is_bid = rng.range(0, 1) == 0;
@@ -481,46 +668,79 @@ fn gen_clob(rng: &mut Rng, n: usize) -> String {
             let price = if is_bid { mid - offset.min(mid - tick) } else { mid + offset };
             let qty = lot * rng.range(1, 5_000);
             book.rest(price, qty, is_bid);
-            let _ = writeln!(body, "        rest(&mut sc, &mut m, {price}, {qty}, {is_bid});");
+            let recv = if aptos { "m" } else { "&mut sc, &mut m" };
+            let _ = writeln!(body, "        rest({recv}, {price}, {qty}, {is_bid});");
         }
-        let _ = writeln!(body, "        ts::return_shared(m);");
-        let _ = writeln!(body, "        sc.next_tx(TAKER);");
-        let _ = writeln!(body, "        let mut m = sc.take_shared<Market<BASE, QUOTE>>();");
+        if !aptos {
+            let _ = writeln!(body, "        ts::return_shared(m);");
+            let _ = writeln!(body, "        sc.next_tx(TAKER);");
+            let _ = writeln!(body, "        let mut m = sc.take_shared<Market<BASE, QUOTE>>();");
+        }
 
         // Budgets from dust to more than the whole side.
         let budget = rng.magnitude(2, 13);
         let sell = rng.magnitude(2, 13);
         let (buy_out, buy_used) = book.quote_quote_for_base(budget);
         let (sell_out, sell_used) = book.quote_base_for_quote(sell);
-        let _ = writeln!(
-            body,
-            "        let (q, u) = market::quote_quote_for_base(&m, {budget});\n        \
-                     assert!(q == {buy_out} && u == {buy_used}, 0);\n        \
-                     let (q, u) = market::quote_base_for_quote(&m, {sell});\n        \
-                     assert!(q == {sell_out} && u == {sell_used}, 1);"
-        );
+        if aptos {
+            let _ = writeln!(
+                body,
+                "        let (q, u) = market::quote_quote_for_base<BASE, QUOTE>(m, {budget});\n        \
+                         assert!(q == {buy_out} && u == {buy_used}, 0);\n        \
+                         let (q, u) = market::quote_base_for_quote<BASE, QUOTE>(m, {sell});\n        \
+                         assert!(q == {sell_out} && u == {sell_used}, 1);"
+            );
+        } else {
+            let _ = writeln!(
+                body,
+                "        let (q, u) = market::quote_quote_for_base(&m, {budget});\n        \
+                         assert!(q == {buy_out} && u == {buy_used}, 0);\n        \
+                         let (q, u) = market::quote_base_for_quote(&m, {sell});\n        \
+                         assert!(q == {sell_out} && u == {sell_used}, 1);"
+            );
+        }
 
         // Then execute both, buying first: the sell reads bids only, so the
         // buy's consumption of the asks does not change it.
         book.take_quote_for_base(budget);
-        let _ = writeln!(
-            body,
-            "        let c = coin::mint_for_testing<QUOTE>({budget}, sc.ctx());\n        \
-                     let (o, ch) = market::swap_quote_for_base(&mut m, c, 0, sc.ctx());\n        \
-                     assert!(o.value() == {buy_out} && ch.value() == {}, 2);\n        \
-                     coin::burn_for_testing(o);\n        \
-                     coin::burn_for_testing(ch);\n        \
-                     let c = coin::mint_for_testing<BASE>({sell}, sc.ctx());\n        \
-                     let (o, ch) = market::swap_base_for_quote(&mut m, c, 0, sc.ctx());\n        \
-                     assert!(o.value() == {sell_out} && ch.value() == {}, 3);\n        \
-                     coin::burn_for_testing(o);\n        \
-                     coin::burn_for_testing(ch);\n        \
-                     assert!(market::best_ask(&m) == {}, 4);",
-            budget - buy_used,
-            sell - sell_used,
-            book.asks.first().map_or(u64::MAX, |l| l.0),
-        );
-        let _ = writeln!(body, "        ts::return_shared(m);\n        sc.end();\n    }}");
+        let best_ask = book.asks.first().map_or(u64::MAX, |l| l.0);
+        if aptos {
+            let _ = writeln!(
+                body,
+                "        let c = mint_quote({budget});\n        \
+                         let (o, ch) = market::swap_quote_for_base<BASE, QUOTE>(&signs(TAKER), m, c, 0);\n        \
+                         assert!(coin::value(&o) == {buy_out} && coin::value(&ch) == {}, 2);\n        \
+                         burn_base(o);\n        \
+                         burn_quote(ch);\n        \
+                         let c = mint_base({sell});\n        \
+                         let (o, ch) = market::swap_base_for_quote<BASE, QUOTE>(&signs(TAKER), m, c, 0);\n        \
+                         assert!(coin::value(&o) == {sell_out} && coin::value(&ch) == {}, 3);\n        \
+                         burn_quote(o);\n        \
+                         burn_base(ch);\n        \
+                         assert!(market::best_ask<BASE, QUOTE>(m) == {best_ask}, 4);",
+                budget - buy_used,
+                sell - sell_used,
+            );
+            let _ = writeln!(body, "    }}");
+        } else {
+            let _ = writeln!(
+                body,
+                "        let c = coin::mint_for_testing<QUOTE>({budget}, sc.ctx());\n        \
+                         let (o, ch) = market::swap_quote_for_base(&mut m, c, 0, sc.ctx());\n        \
+                         assert!(o.value() == {buy_out} && ch.value() == {}, 2);\n        \
+                         coin::burn_for_testing(o);\n        \
+                         coin::burn_for_testing(ch);\n        \
+                         let c = coin::mint_for_testing<BASE>({sell}, sc.ctx());\n        \
+                         let (o, ch) = market::swap_base_for_quote(&mut m, c, 0, sc.ctx());\n        \
+                         assert!(o.value() == {sell_out} && ch.value() == {}, 3);\n        \
+                         coin::burn_for_testing(o);\n        \
+                         coin::burn_for_testing(ch);\n        \
+                         assert!(market::best_ask(&m) == {best_ask}, 4);",
+                budget - buy_used,
+                sell - sell_used,
+            );
+            let _ = writeln!(body, "        ts::return_shared(m);\n        sc.end();\n    }}");
+        }
         out.push_str(&body);
     }
 
@@ -586,6 +806,12 @@ fn write(path: &str, contents: &str) {
     println!("{path}: {asserts} cases in {tests} test functions");
 }
 
+/// Write one dialect-neutral file into both the Sui and the Aptos tree.
+fn write_both(rel: &str, contents: &str) {
+    write(&format!("../move/sui/{rel}"), contents);
+    write(&format!("../move/aptos/{rel}"), contents);
+}
+
 fn main() {
     let n: usize = std::env::args()
         .nth(1)
@@ -601,31 +827,51 @@ fn main() {
     let mut rng_clob = Rng(SEED ^ 0xC10B_u64);
     let mut rng_routes = Rng(SEED ^ 0x2007E_u64);
 
-    write(
-        "../move/sui/braid_cpmm/tests/generated_diff_tests.move",
+    // The formula suites are dialect-neutral: pure functions, integer
+    // arguments, no chain types anywhere. The same bytes go to both trees, so
+    // `diff move/sui/<pkg>/tests/generated_diff_tests.move
+    //       move/aptos/<pkg>/tests/generated_diff_tests.move` is empty --
+    // which is the point. One corpus, two Move VMs, and they agree or the
+    // build fails.
+    write_both(
+        "braid_cpmm/tests/generated_diff_tests.move",
         &gen_cpmm(&mut rng_cpmm, n),
     );
-    write(
-        "../move/sui/braid_stable/tests/generated_diff_tests.move",
+    write_both(
+        "braid_stable/tests/generated_diff_tests.move",
         &gen_stable(&mut rng_stable, n),
     );
-    write(
-        "../move/sui/braid_clmm/tests/generated_diff_tests.move",
+    write_both(
+        "braid_clmm/tests/generated_diff_tests.move",
         &gen_clmm_math(&mut rng_clmm, n),
     );
-    // Whole scenarios are far heavier than single formulas, so fewer of them.
+
+    // Whole scenarios are far heavier than single formulas, so fewer of them --
+    // and these two do build chain state, so each dialect gets its own
+    // rendering. Both come off identically seeded streams, so case `k` is the
+    // same pool and the same trades on either chain.
     write(
         "../move/sui/braid_clmm/tests/generated_pool_diff_tests.move",
-        &gen_clmm_pools(&mut rng_pools, n / 4),
+        &gen_clmm_pools(&mut rng_pools, n / 4, Dialect::Sui),
+    );
+    write(
+        "../move/aptos/braid_clmm/tests/generated_pool_diff_tests.move",
+        &gen_clmm_pools(&mut Rng(SEED ^ 0x9001_5EED_u64), n / 4, Dialect::Aptos),
     );
     write(
         "../move/sui/braid_clob/tests/generated_market_diff_tests.move",
-        &gen_clob(&mut rng_clob, n / 8),
+        &gen_clob(&mut rng_clob, n / 8, Dialect::Sui),
     );
+    write(
+        "../move/aptos/braid_clob/tests/generated_market_diff_tests.move",
+        &gen_clob(&mut Rng(SEED ^ 0xC10B_u64), n / 8, Dialect::Aptos),
+    );
+
+    // The router is Sui-only for now; see docs/aptos-port.md.
     write(
         "../move/sui/braid_router/tests/generated_route_diff_tests.move",
         &gen_routes(&mut rng_routes, n / 16),
     );
 
-    println!("\nNow run:  bash scripts/test.sh");
+    println!("\nNow run:  bash scripts/test.sh && bash scripts/test-aptos.sh");
 }
