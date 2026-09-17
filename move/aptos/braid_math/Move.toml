@@ -1,0 +1,29 @@
+[package]
+name = "braid_math"
+version = "0.1.0"
+license = "Apache-2.0"
+
+# Aptos has no `edition` key. The dialect is selected by the compiler, not the
+# manifest: CLI 7.x compiles Move 2 by default, which is the rough counterpart
+# of Sui's `edition = "2024.beta"`. See docs/aptos-port.md.
+
+[addresses]
+# `_` means "assigned at publish time". Sui pins `0x0` here and rewrites it to
+# the package id the publish transaction produced; Aptos resolves it to the
+# account that publishes, which is chosen by the deployer. So the Sui side has
+# one address per package and the Aptos side can put every package under one.
+braid_math = "_"
+
+[dev-addresses]
+# Tests need a concrete value for `_`. Sui needs no equivalent because `0x0` is
+# already concrete there.
+braid_math = "0xB4A1D"
+
+# The framework is pinned to the tag the vendored CLI was cut from, not to a
+# branch. A newer framework fails to parse on an older compiler -- `aptos-core`
+# ships the two together and the language version moves under you otherwise.
+# Bump this and `APTOS_VERSION` in scripts/get-aptos.sh as a pair.
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+subdir = "aptos-move/framework/aptos-framework"
+rev = "aptos-cli-v7.2.0"
