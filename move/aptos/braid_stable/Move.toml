@@ -1,0 +1,27 @@
+[package]
+name = "braid_stable"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[addresses]
+braid_stable = "_"
+
+# Distinct values per named address -- see the note in braid_cpmm/Move.toml.
+[dev-addresses]
+braid_stable = "0x57AB1E"
+braid_cpmm = "0xCEE"
+braid_math = "0xB4A1D"
+
+[dependencies]
+braid_math = { local = "../braid_math" }
+
+# Test-only: the stableswap's whole justification is that it prices a pegged
+# pair better than constant product, so the suite proves it against the real
+# CPMM rather than against a hardcoded number.
+[dev-dependencies]
+braid_cpmm = { local = "../braid_cpmm" }
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+subdir = "aptos-move/framework/aptos-framework"
+rev = "aptos-cli-v7.2.0"
