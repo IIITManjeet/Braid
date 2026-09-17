@@ -1,0 +1,27 @@
+[package]
+name = "braid_cpmm"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[addresses]
+braid_cpmm = "_"
+
+# Every named address in the graph needs a *distinct* dev value: Aptos rejects
+# a dev assignment that collides with another, so that a package is guaranteed
+# to compile under any real address assignment. At publish time they all become
+# one account again -- this constraint exists only to keep the tests honest.
+[dev-addresses]
+braid_cpmm = "0xCEE"
+braid_math = "0xB4A1D"
+
+[dependencies]
+# Local, and it stays local. On Sui this line becomes an on-chain dependency at
+# deploy time, because Sui publishes one package per transaction and gives each
+# its own id. Aptos publishes a whole package set under one account and resolves
+# `braid_math` to that same account, so there is nothing to rewrite.
+braid_math = { local = "../braid_math" }
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+subdir = "aptos-move/framework/aptos-framework"
+rev = "aptos-cli-v7.2.0"
