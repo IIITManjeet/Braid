@@ -1,16 +1,17 @@
 # Porting Braid from Sui Move to Aptos Move
 
-`move/aptos/` is the phase-2 port of the first three Sui packages: `braid_math`,
-`braid_cpmm`, `braid_stable`. Both trees are live and both test suites run in
-CI-shaped one-liners:
+`move/aptos/` is the phase-2 port of five of the six Sui packages: `braid_math`,
+`braid_cpmm`, `braid_stable`, `braid_clmm` and `braid_clob`. Only `braid_router`
+is still Sui-only, for a reason worth its own section at the end. Both trees are
+live and both suites run in CI-shaped one-liners:
 
 ```bash
 bash scripts/test.sh         # all of move/sui: 570 tests, plus the Rust replica
-bash scripts/test-aptos.sh   # all of move/aptos: 163 tests
+bash scripts/test-aptos.sh   # all of move/aptos: 537 tests
 ```
 
-Counting only the three packages that exist on both sides: **162 tests on Sui,
-163 on Aptos.** The extra one is explained below, and it is the only behavioural
+Counting only the five packages that exist on both sides: **536 tests on Sui,
+537 on Aptos.** The extra one is explained below, and it is the only behavioural
 difference in the whole port.
 
 This note is what the port actually cost, separated into the two categories that
@@ -19,13 +20,38 @@ the two chains disagree about what a program *is*.
 
 The headline: **the pricing math is the same code, and the generated
 differential-fuzz corpora are byte-identical files that pass unmodified on both
-chains.** `diff move/sui/braid_cpmm/tests/generated_diff_tests.move
-move/aptos/braid_cpmm/tests/generated_diff_tests.move` is empty, and so is the
-StableSwap one. 1,829 cases produced by the Rust replica in `node/crates` now
-run against two independent Move VMs and agree with both to the unit. That is a
+chains.** For the three formula suites, `diff` between the trees is empty:
+
+```bash
+diff move/sui/braid_cpmm/tests/generated_diff_tests.move \
+     move/aptos/braid_cpmm/tests/generated_diff_tests.move   # empty
+# likewise braid_stable and braid_clmm
+```
+
+3,029 formula cases produced by the Rust replica in `node/crates` now run
+against two independent Move VMs and agree with both to the unit. That is a
 stronger claim than the Sui tree could make alone: a replica that matches one
 implementation might have copied its bug, but a replica that matches two
 implementations on two VMs is describing the arithmetic, not the code.
+
+The two *whole-scenario* corpora -- 100 random CLMM pools and 50 random order
+books -- cannot be byte-identical, because they build chain state and that is
+exactly what differs. So `braid-difftest` now renders them twice, from
+identically seeded RNG streams, and case `k` in the Sui file is the same pool
+and the same trades as case `k` in the Aptos file. Every one passes on both. The
+CLMM suite is 246 tests on either chain and the CLOB suite 128, the same numbers
+on both sides:
+
+```rust
+write("../move/sui/braid_clmm/tests/generated_pool_diff_tests.move",
+      &gen_clmm_pools(&mut rng_pools, n / 4, Dialect::Sui));
+write("../move/aptos/braid_clmm/tests/generated_pool_diff_tests.move",
+      &gen_clmm_pools(&mut Rng(SEED ^ 0x9001_5EED_u64), n / 4, Dialect::Aptos));
+```
+
+Regenerating still reproduces the committed Sui files byte for byte, so the
+"a silent repricing becomes a reviewable line in a pull request" property the
+README claims survives the port -- now across two chains.
 
 ---
 
@@ -202,6 +228,80 @@ refuses those outright, since an asset's metadata must outlive anything
 denominated in it. The failure is a bare `65554` from inside the framework, which
 is a while to track down the first time.
 
+### A reference cannot leave global storage
+
+The sharpest surprise of the CLOB port. Sui's market hands the book out whole:
+
+```move
+public fun book<Base, Quote>(market: &Market<Base, Quote>): &Book { &market.book }
+```
+
+Callers then reach through it -- `book::has_order(market::book(&m), id)`. The
+Aptos version does not compile:
+
+```
+error: cannot return a reference derived from struct `market::Market`
+       since it is not based on a parameter
+    │ public fun book<Base, Quote>(market_id: address): &Book acquires Market {
+```
+
+Reference safety will not let a borrow of global storage outlive the function
+that took it, and on Aptos the market *is* global storage rather than a
+parameter. Sui has no such problem because the caller already owns the
+reference — it came in as an argument. So every accessor is forwarded
+individually instead (`market::has_order`, `market::order_owner`,
+`market::depth_at`, …), which is more code and, as it happens, more useful:
+each forwarder can be a `#[view]`, and a `&Book` never could be.
+
+### Storage operations belong to the defining module
+
+Sui's `MarketCap` is an owned object. Its holder transfers it, stores it, or
+passes it to `collect_fees`, and `market.move` has no say. The Aptos test tried
+the equivalent and got:
+
+```
+error: Invalid operation: storage operation on type `market::MarketCap`
+       can only be done within the defining module `0xc10b::market`
+```
+
+`move_to` and `borrow_global` on a type are confined to the module that declares
+it. So a cap holder *cannot put their own cap away*; the market has to offer
+
+```move
+public fun store_cap(owner: &signer, cap: MarketCap) { move_to(owner, cap); }
+```
+
+and a matching reader, neither of which exists on the Sui side. The authority is
+still the value rather than an address recorded in the market -- `collect_fees`
+takes `&MarketCap` on both chains -- but the custody of that value is now the
+declaring module's business. This is the same rule from the other direction as
+the reference one above: Aptos draws a hard boundary at global storage, and Sui
+draws it at object ownership.
+
+### Tables
+
+`sui::table::Table` has two Aptos counterparts, and picking the wrong one is a
+compile error rather than a silent cost:
+
+| | length tracked? | `destroy_empty`? | used by |
+|---|---|---|---|
+| `sui::table` | yes | yes | everything, on Sui |
+| `aptos_std::table` | no | no | the CLMM pool's ticks, bitmap, positions; the market's claims |
+| `aptos_std::table_with_length` | yes | yes | the critbit tree and the book |
+
+`critbit` and `book` call `table::destroy_empty`, which needs to know the table
+is empty, so they take the with-length variant. Nothing counts or destroys the
+CLMM pool's three tables, so they take the plain one and skip a length write on
+every tick update. Aliasing the import keeps the rest of `critbit.move` and
+`book.move` character-for-character the Sui source:
+
+```move
+use aptos_std::table_with_length::{Self as table, TableWithLength as Table};
+```
+
+Those two modules are otherwise an eleven-line diff each, almost all of it that
+import and `empty()` losing its `&mut TxContext`.
+
 ### Sui `Balance`/`Supply` vs Aptos `Coin`/`FungibleAsset`
 
 The most interesting finding of the port. Compare abilities:
@@ -325,21 +425,66 @@ Aptos VM all agree on it.
 
 ---
 
-## What is not ported yet
+### What the concentrated pool needed, and did not
 
-`braid_clmm`, `braid_clob` and `braid_router` are still Sui-only. The math
-modules in all three are pure and should transliterate the same way the first
-three did — the work is in `pool.move`, `market.move` and `route.move`, where
-the custody model decisions above have to be made again.
+`braid_clmm` is the largest port and the least eventful, which is the useful
+finding. Eight of its nine modules are pure arithmetic -- tick math, the bitmap,
+fee growth, the swap step, the signed integer types -- and they moved across on
+`let mut` → `let` plus four non-ASCII characters in a comment. 128 tests, no
+hand edits.
 
-`braid_router` is the interesting one. `Route` is a hot potato: no abilities, so
-a PTB that calls `begin` cannot complete without handing it to `finish`, which is
-where `min_out` is enforced on the total. Aptos has no PTBs, so there is no
-partially-built transaction for the type system to hold hostage — the whole route
-would execute inside one Move function instead. The safety property survives, but
-it stops being a *type* property and becomes an ordinary control-flow one. That
-is the sharpest difference between the two chains this project touches, and it is
-the reason the router is the last thing to port rather than the first.
+`pool.move` is the exception, and even there only the public entry points
+changed. Each one resolves the pool with a single `borrow_global_mut` and then
+calls the same private helpers, taking the same `&mut Pool<A, B>` the Sui
+version passes in, so `modify_position`, `run_swap` and the tick accessors are
+character-for-character the Sui source. The swap loop is the part that must not
+drift, and threading storage access only through the boundary is what guarantees
+it cannot.
+
+Two smaller things:
+
+- **`ctx.sender()` becomes an explicit `&signer`.** Sui authenticates the
+  position owner through the transaction context. Here the authority is passed,
+  and `remove_liquidity` and `collect` would be a theft primitive if it were a
+  bare `address`.
+- **`create_sticky_object`, not `create_object`.** The latter yields a
+  *deletable* object and `fungible_asset::add_fungibility` refuses those, since
+  an asset's metadata must outlive anything denominated in it. The failure is a
+  bare `65554` from inside the framework, which is a while to track down.
+
+One line of Sui did not come across: `public struct LP<phantom A, phantom B>`,
+declared in the CLMM pool and never used -- concentrated positions are keyed
+records, not tokens. A port is the wrong moment to copy dead code forward.
+
+## What is not ported
+
+`braid_router`. Not for want of effort — it is the one place where the property
+the Sui code relies on does not exist on the other chain.
+
+`Route` is a hot potato: no abilities, so a PTB that calls `begin` cannot
+complete without handing it to `finish`, which is where `min_out` is enforced on
+the *total* rather than per leg. The type system holds a partially-built
+transaction hostage until the bound is checked. Aptos has no PTBs, so there is
+no partially-built transaction to hold — the whole route would execute inside
+one Move function instead. The safety property survives, but it stops being a
+*type* property and becomes an ordinary control-flow one, which is a real
+downgrade in what the compiler proves rather than a change of spelling.
+
+The irony, noted above: Aptos ships `FungibleAsset` on exactly this trick. The
+pattern is available; what is missing is a caller-assembled transaction for it
+to constrain.
 
 Nothing is deployed to Aptos testnet yet; the Sui addresses in the README remain
 the only live deployment.
+
+## What turned out not to be a difference
+
+Worth recording, because each of these looked like one at first:
+
+- **Vector method and index syntax.** `v.length()`, `v[i]`, `v.is_empty()` all
+  work on Aptos. An earlier draft of this port rewrote them into
+  `std::vector::…` calls for nothing; the rewrite was reverted.
+- **`public struct`.** Aptos accepts the Sui-2024 spelling, so the sed'd files
+  kept it and the diff stayed smaller than expected.
+- **`#[test]` and `#[expected_failure]`.** Identical, apart from the abort-code
+  path form.

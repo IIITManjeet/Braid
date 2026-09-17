@@ -59,8 +59,8 @@ does the Rust, and where it floor-divides twice in sequence rather than once by 
 does the Rust. Floor division does not reassociate, so operation order is part of the spec.
 
 `braid-difftest` generates random pool states and trades, computes each answer with the
-replica, and emits them as Move test files. `sui move test` then runs every case through the
-real Move VM. **A one-unit disagreement fails the build.** It covers every venue:
+replica, and emits them as Move test files. Both Move VMs then run every case. **A one-unit
+disagreement fails the build.** It covers every venue, on both chains:
 
 | Venue | Generated cases |
 |---|---|
@@ -73,15 +73,21 @@ The generated files are committed on purpose. The RNG is seeded, so regenerating
 identical file unless a *value* moved -- and then the diff names the case and the delta. A
 silent repricing becomes a reviewable line in a pull request.
 
+The three formula suites are emitted once and written to both trees unchanged, so `diff`
+between `move/sui/*/tests/generated_diff_tests.move` and its `move/aptos/` twin is empty. The
+whole-scenario suites build chain state, so they are rendered per dialect from identically
+seeded streams: case `k` is the same pool and the same trades on either chain.
+
 ```bash
-cargo run -p braid-difftest    # regenerate, from node/
-bash scripts/test.sh           # Move VM checks every case
+cargo run -p braid-difftest    # regenerate both trees, from node/
+bash scripts/test.sh           # the Sui VM checks every case
+bash scripts/test-aptos.sh     # so does the Aptos one
 ```
 
-**What it proves:** the two implementations do not diverge. That catches a mis-transliterated
+**What it proves:** the implementations do not diverge. That catches a mis-transliterated
 operation order, a floor where the other has a ceil, a `u128` intermediate where the other
 widened -- the class of bug where the off-chain quote engine promises a price the chain will
-not honour.
+not honour. With the port in place it is three implementations and two VMs, not two and one.
 
 **What it does not prove:** that either side is economically right. Two implementations can
 agree and both be wrong. That is covered separately -- hand-derived fixtures, the invariant
@@ -108,9 +114,7 @@ move/sui/braid_stable/   Curve-style stableswap                                 
 move/sui/braid_clmm/     concentrated liquidity                                     [done]
 move/sui/braid_clob/     central limit order book                                   [done]
 move/sui/braid_router/   atomic multi-venue route execution                        [done]
-move/aptos/braid_math/   phase 2: the Aptos port                                   [done]
-move/aptos/braid_cpmm/   phase 2: the Aptos port                                   [done]
-move/aptos/braid_stable/ phase 2: the Aptos port                                   [done]
+move/aptos/*             phase 2: the port -- every package but the router        [done]
 node/crates/             Rust: replica, difftest generator, route optimizer         [done]
 bench/                   gas costs per venue, p99 quote latency
 docs/                    design notes, invariant derivations
@@ -191,34 +195,50 @@ Redeploy or extend with `bash scripts/deploy.sh`.
 
 ## The Aptos port
 
-The same exchange, on the other Move chain. `braid_math`, `braid_cpmm` and
-`braid_stable` are live under `move/aptos/` and their suites are green: **162
-tests on Sui, 163 on Aptos.**
+All four venues, on the other Move chain. `braid_math`, `braid_cpmm`,
+`braid_stable`, `braid_clmm` and `braid_clob` are live under `move/aptos/` and
+their suites are green: **536 tests on Sui, 537 on Aptos.** Only `braid_router`
+is still Sui-only, for a reason given below.
 
-The pricing math is the *same code* -- `cpmm_math.move` and `stable_math.move`
-differ only by `let mut` becoming `let`, because Aptos Move has no `mut` on
-locals. Better, the generated differential-fuzz corpora are byte-identical files:
+The pricing math is the *same code*. `cpmm_math.move` is byte-identical to the
+Sui file; the CLMM's eight pure modules -- tick math, the bitmap, fee growth, the
+swap step, the signed integers -- moved across on `let mut` → `let` and four
+non-ASCII characters in a comment, and pass 128 tests with no hand edits.
+
+Better, the generated differential-fuzz corpora are byte-identical files:
 
 ```bash
 diff move/sui/braid_cpmm/tests/generated_diff_tests.move \
      move/aptos/braid_cpmm/tests/generated_diff_tests.move   # empty
 ```
 
-So the 1,829 cases the Rust replica produced now run against two independent
-Move VMs and agree with both to the unit. A replica that matches one
-implementation might have copied its bug; one that matches two is describing the
-arithmetic.
+So 3,029 formula cases from the Rust replica run against two independent Move
+VMs and agree with both to the unit. A replica that matches one implementation
+might have copied its bug; one that matches two is describing the arithmetic.
 
-`pool.move` is not a transliteration, and that is where the writeup lives. Sui
-passes a shared object as `&mut Pool<A, B>`; Aptos keeps resources in global
-storage, so the pool arrives as an `address` and the module must check it exists
--- which is the entire 162-vs-163 test difference, one test named
+The 100 whole-pool CLMM scenarios and 50 order-book scenarios *do* build chain
+state, so `braid-difftest` renders them twice from identically seeded streams --
+case `k` is the same pool and the same trades on either chain. All of them pass
+on both, and regenerating still reproduces the committed Sui files byte for byte.
+
+`pool.move` and `market.move` are not transliterations, and that is where the
+writeup lives. Sui passes a shared object as `&mut Pool<A, B>`; Aptos keeps
+resources in global storage, so the pool arrives as an `address` and the module
+must check it exists -- the entire 536-vs-537 difference, one test named
 `a_swap_against_an_address_holding_no_pool_aborts`. Sui's LP token is its own
 minting witness via `balance::create_supply`; Aptos's `coin::initialize` demands
 a signer for the address that *declares* the type, so LP is a fungible asset
-whose `MintRef` lives inside the pool and pool creation stays permissionless.
-And Aptos's `FungibleAsset` has no abilities at all -- it is a hot potato, the
-same trick `braid_router` uses for `Route`.
+whose `MintRef` lives inside the pool and creation stays permissionless. Aptos's
+`FungibleAsset` has no abilities at all -- it is a hot potato, the same trick
+`braid_router` uses for `Route`. And two hard boundaries Sui does not draw: a
+reference into global storage cannot be returned, and `move_to` on a type is
+confined to the module that declares it.
+
+`braid_router` is the one thing that does not port. `Route` has no abilities, so
+a PTB that calls `begin` cannot complete without handing it to `finish`, where
+`min_out` is enforced on the total. Aptos has no PTBs, so there is no
+partially-built transaction for the type system to hold hostage -- the route
+would run inside one function and the guarantee stops being a *type* property.
 
 The StableSwap pool still returns **999,590** for 1,000,000 in: the number the
 live Sui testnet swap below produced. Four implementations agree on it now.
@@ -262,7 +282,7 @@ Every package's tests, in one go:
 
 ```bash
 bash scripts/test.sh            # Sui: 570 Move tests, plus the Rust replica
-bash scripts/test-aptos.sh      # Aptos: 163 Move tests
+bash scripts/test-aptos.sh      # Aptos: 537 Move tests
 ```
 
 ## Status
@@ -277,6 +297,7 @@ bash scripts/test-aptos.sh      # Aptos: 163 Move tests
 - [x] CLMM: ticks, bitmap, fee growth, swap stepping, pool (125 tests)
 - [x] CLOB: crit-bit tree, matching, custody and settlement (78 tests), live on testnet
 - [x] Router: hot-potato route, Rust optimizer, CLMM and CLOB replicas, live four-venue route
-- [x] Aptos port: `braid_math`, `braid_cpmm`, `braid_stable` (163 tests), dialect writeup
-- [ ] Aptos port: `braid_clmm`, `braid_clob`, `braid_router`
+- [x] Aptos port: all four venues plus `braid_math` (537 tests), dialect writeup
+- [x] `braid-difftest` emits both dialects; the formula corpora are byte-identical
+- [ ] Aptos port: `braid_router` -- needs a design without PTBs
 - [ ] Deploy the Aptos packages to testnet
