@@ -68,15 +68,17 @@ disagreement fails the build.** It covers every venue, on both chains:
 | StableSwap | 1,087 formula checks |
 | CLMM | 1,200 formula checks, plus 100 whole-pool scenarios -- random positions, then swaps across initialized ticks and empty bitmap words |
 | CLOB | 50 order-book scenarios -- random books, quoted then executed in both directions |
+| Router | 25 optimizer plans, each executed at `min_out` equal to its predicted output |
 
 The generated files are committed on purpose. The RNG is seeded, so regenerating produces an
 identical file unless a *value* moved -- and then the diff names the case and the delta. A
 silent repricing becomes a reviewable line in a pull request.
 
-The three formula suites are emitted once and written to both trees unchanged, so `diff`
-between `move/sui/*/tests/generated_diff_tests.move` and its `move/aptos/` twin is empty. The
-whole-scenario suites build chain state, so they are rendered per dialect from identically
-seeded streams: case `k` is the same pool and the same trades on either chain.
+The three formula suites and the route suite are emitted once and written to both trees
+unchanged, so `diff` between each `move/sui/*/tests/generated_*.move` and its `move/aptos/`
+twin is empty. The CLMM and CLOB scenario suites build chain state, so they are rendered per
+dialect from identically seeded streams: case `k` is the same pool and the same trades on
+either chain.
 
 ```bash
 cargo run -p braid-difftest    # regenerate both trees, from node/
@@ -99,11 +101,12 @@ The harness is verified against negative controls: flipping one `mul_div_floor` 
 replica skip empty bitmap-word boundaries -- walking a sorted tick list, as a natural
 reimplementation would -- fails 58 of the 100 pool scenarios.
 
-**Not yet wired:** reading return values back from the deployed bytecode. `sui client
+**Not yet wired on Sui:** reading return values back from the deployed bytecode. `sui client
 --dev-inspect` on CLI 1.78 renders a dry run without return values, and the GraphQL
 `simulateTransaction` field wants a protobuf-shaped transaction rather than serialized BCS.
-The on-chain anchor for now is the real testnet swap below, whose result the replica
-reproduces exactly.
+The on-chain anchor there is the real testnet swap below, whose result the replica
+reproduces exactly. On Aptos it is wired: `#[view]` quotes from a live node are compared with
+the replica before every deployment route is sent.
 
 ## Layout
 
@@ -114,9 +117,9 @@ move/sui/braid_stable/   Curve-style stableswap                                 
 move/sui/braid_clmm/     concentrated liquidity                                     [done]
 move/sui/braid_clob/     central limit order book                                   [done]
 move/sui/braid_router/   atomic multi-venue route execution                        [done]
-move/aptos/*             phase 2: the port -- every package but the router        [done]
-node/crates/             Rust: replica, difftest generator, route optimizer         [done]
-bench/                   gas costs per venue, p99 quote latency
+move/aptos/*             phase 2: the port -- all six, plus test coins and scripts [done]
+node/crates/             Rust: replica, difftest generator, route optimizer, bench  [done]
+bench/                   gas costs per venue on both chains, p99 quote latency      [done]
 docs/                    design notes, invariant derivations
 ```
 
@@ -195,10 +198,8 @@ Redeploy or extend with `bash scripts/deploy.sh`.
 
 ## The Aptos port
 
-All four venues, on the other Move chain. `braid_math`, `braid_cpmm`,
-`braid_stable`, `braid_clmm` and `braid_clob` are live under `move/aptos/` and
-their suites are green: **536 tests on Sui, 537 on Aptos.** Only `braid_router`
-is still Sui-only, for a reason given below.
+All six packages, on the other Move chain, and green: **570 tests on Sui, 574 on
+Aptos.** Counting only the five math and venue packages, 536 against 537.
 
 The pricing math is the *same code*. `cpmm_math.move` is byte-identical to the
 Sui file; the CLMM's eight pure modules -- tick math, the bitmap, fee growth, the
@@ -210,50 +211,65 @@ Better, the generated differential-fuzz corpora are byte-identical files:
 ```bash
 diff move/sui/braid_cpmm/tests/generated_diff_tests.move \
      move/aptos/braid_cpmm/tests/generated_diff_tests.move   # empty
+diff move/sui/braid_router/tests/generated_route_diff_tests.move \
+     move/aptos/braid_router/tests/generated_route_diff_tests.move   # empty
 ```
 
 So 3,029 formula cases from the Rust replica run against two independent Move
-VMs and agree with both to the unit. A replica that matches one implementation
+VMs and agree with both to the unit, and all 25 optimizer plans pay exactly their
+predicted output through both routers. A replica that matches one implementation
 might have copied its bug; one that matches two is describing the arithmetic.
-
-The 100 whole-pool CLMM scenarios and 50 order-book scenarios *do* build chain
-state, so `braid-difftest` renders them twice from identically seeded streams --
-case `k` is the same pool and the same trades on either chain. All of them pass
-on both, and regenerating still reproduces the committed Sui files byte for byte.
 
 `pool.move` and `market.move` are not transliterations, and that is where the
 writeup lives. Sui passes a shared object as `&mut Pool<A, B>`; Aptos keeps
 resources in global storage, so the pool arrives as an `address` and the module
-must check it exists -- the entire 536-vs-537 difference, one test named
-`a_swap_against_an_address_holding_no_pool_aborts`. Sui's LP token is its own
-minting witness via `balance::create_supply`; Aptos's `coin::initialize` demands
-a signer for the address that *declares* the type, so LP is a fungible asset
-whose `MintRef` lives inside the pool and creation stays permissionless. Aptos's
-`FungibleAsset` has no abilities at all -- it is a hot potato, the same trick
-`braid_router` uses for `Route`. And two hard boundaries Sui does not draw: a
-reference into global storage cannot be returned, and `move_to` on a type is
-confined to the module that declares it.
-
-`braid_router` is the one thing that does not port. `Route` has no abilities, so
-a PTB that calls `begin` cannot complete without handing it to `finish`, where
-`min_out` is enforced on the total. Aptos has no PTBs, so there is no
-partially-built transaction for the type system to hold hostage -- the route
-would run inside one function and the guarantee stops being a *type* property.
+must check it exists. Sui's LP token is its own minting witness; Aptos's
+`coin::initialize` demands the declaring address's signer, so LP is a fungible
+asset whose `MintRef` lives inside the pool. Aptos's `FungibleAsset` has no
+abilities at all -- a hot potato, the same trick `braid_router` uses for `Route`.
+And two hard boundaries Sui does not draw: a reference into global storage cannot
+be returned, and `move_to` on a type is confined to the module that declares it.
 
 The StableSwap pool still returns **999,590** for 1,000,000 in: the number the
-live Sui testnet swap below produced. Four implementations agree on it now.
+live Sui testnet swap above produced. Four implementations agree on it now.
+
+**The router ports, and its guarantee survives.** On Sui, `Route` has no abilities, so a
+PTB that calls `begin` cannot complete without handing it to `finish`, where `min_out` is
+enforced on the total. Aptos has no PTBs, but it has **transaction scripts**: compiled
+Move whose `main` composes public calls in one transaction, verified like any module.
+[`route_a_to_b.move`](move/aptos/braid_router/scripts/route_a_to_b.move) is the Sui PTB
+almost line for line; remove its `finish` and it no longer compiles.
+
+**Deploying found a real difference.** Three packages have a module named `pool`, and
+Aptos keys modules by `(address, name)`, so they cannot share an account -- the second
+publish aborts with `EMODULE_NAME_CLASH`. [`scripts/aptos.py`](scripts/aptos.py) puts each
+package in its own resource account, seeds the four venues exactly as the router tests do,
+plans a route offline in Rust, checks the live `#[view]` quotes against the plan, and sends
+it with `min_out` equal to the prediction. On a localnet, an 8,000,000 TUSD route through all
+four venues matched the plan to the unit on every leg:
 
 ```bash
-bash scripts/get-aptos.sh      # vendors the Aptos CLI into .tools/
+bash scripts/get-aptos.sh              # vendors the Aptos CLI into .tools/
 bash scripts/test-aptos.sh
+python scripts/aptos.py all 8000000    # testnet: needs a funded `braid-testnet` profile
 ```
 
 Full comparison: [docs/aptos-port.md](docs/aptos-port.md).
+
+## Benchmarks
+
+[`bench/`](bench) measures gas per venue on both chains and the replica's quote latency.
+On Sui a swap's cost is almost entirely storage -- computation never leaves the smallest
+bucket -- so the order book, which rewrites the most objects, is the priciest venue. On
+Aptos the concentrated pool's tick walk is. A single quote takes 4 µs at p99; planning a
+four-way split takes 4 ms, because the optimizer quotes hundreds of times.
 
 ## Notes from the build
 
 - [Porting to Aptos Move](docs/aptos-port.md) -- what the dialect forces, and
   where the two chains genuinely disagree about what a program is.
+- [Benchmarks](bench/README.md) -- what a trade costs on each chain, and why
+  the two chains rank the venues differently.
 - [When Newton-Raphson never converges](docs/stableswap-limit-cycles.md) --
   the StableSwap `D` solver has states where it orbits forever instead of
   converging, and Curve's own implementation reverts on them. What causes it,
@@ -282,7 +298,7 @@ Every package's tests, in one go:
 
 ```bash
 bash scripts/test.sh            # Sui: 570 Move tests, plus the Rust replica
-bash scripts/test-aptos.sh      # Aptos: 537 Move tests
+bash scripts/test-aptos.sh      # Aptos: 574 Move tests
 ```
 
 ## Status
@@ -299,5 +315,7 @@ bash scripts/test-aptos.sh      # Aptos: 537 Move tests
 - [x] Router: hot-potato route, Rust optimizer, CLMM and CLOB replicas, live four-venue route
 - [x] Aptos port: all four venues plus `braid_math` (537 tests), dialect writeup
 - [x] `braid-difftest` emits both dialects; the formula corpora are byte-identical
-- [ ] Aptos port: `braid_router` -- needs a design without PTBs
-- [ ] Deploy the Aptos packages to testnet
+- [x] Aptos port: `braid_router`, with transaction scripts in place of PTBs (36 tests)
+- [x] Aptos deployment tooling: per-package resource accounts, seeding, a verified route (localnet)
+- [x] Benchmarks: gas per venue on both chains, quote and planning latency
+- [ ] Run `scripts/aptos.py all` on testnet -- needs APT from the browser-only faucet

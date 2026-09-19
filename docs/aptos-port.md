@@ -1,18 +1,21 @@
 # Porting Braid from Sui Move to Aptos Move
 
-`move/aptos/` is the phase-2 port of five of the six Sui packages: `braid_math`,
-`braid_cpmm`, `braid_stable`, `braid_clmm` and `braid_clob`. Only `braid_router`
-is still Sui-only, for a reason worth its own section at the end. Both trees are
-live and both suites run in CI-shaped one-liners:
+`move/aptos/` is the phase-2 port of all six Sui packages: `braid_math`,
+`braid_cpmm`, `braid_stable`, `braid_clmm`, `braid_clob` and `braid_router`,
+plus the test coins a deployment trades. Both trees run in CI-shaped
+one-liners:
 
 ```bash
 bash scripts/test.sh         # all of move/sui: 570 tests, plus the Rust replica
-bash scripts/test-aptos.sh   # all of move/aptos: 537 tests
+bash scripts/test-aptos.sh   # all of move/aptos: 574 tests
 ```
 
-Counting only the five packages that exist on both sides: **536 tests on Sui,
-537 on Aptos.** The extra one is explained below, and it is the only behavioural
-difference in the whole port.
+Counting only the five venue and math packages: **536 tests on Sui, 537 on
+Aptos.** The extra one is explained below, and it is the only behavioural
+difference among them. The router has 34 tests on Sui and 36 on Aptos; the two
+extra tests cover something only Aptos has, a venue named by address. That
+gets its own section, [The router](#the-router-and-the-transaction-script),
+which also covers the mistake an earlier version of this note made about it.
 
 This note is what the port actually cost, separated into the two categories that
 matter: edits the compiler forced on otherwise identical code, and places where
@@ -48,6 +51,12 @@ write("../move/sui/braid_clmm/tests/generated_pool_diff_tests.move",
 write("../move/aptos/braid_clmm/tests/generated_pool_diff_tests.move",
       &gen_clmm_pools(&mut Rng(SEED ^ 0x9001_5EED_u64), n / 4, Dialect::Aptos));
 ```
+
+The route corpus is byte-identical again. Each of its 25 cases, a split
+planned by the Rust optimizer and executed through the router at a `min_out`
+of exactly its predicted output, is a single call to `test_world::buy_eth`. Each
+tree's test world keeps that signature, so all the chain-specific setup stays
+in hand-written code and the generated file is the same on both chains.
 
 Regenerating still reproduces the committed Sui files byte for byte, so the
 "a silent repricing becomes a reviewable line in a pull request" property the
@@ -124,16 +133,35 @@ assignments in order to ensure that the package will compile with any possible
 address assignment.
 ```
 
-So the three packages take three distinct dev addresses (`0xB4A1D`, `0xCEE`,
-`0x57AB1E`) even though at publish time they all resolve to the *same* account.
-The rule exists to stop a package quietly depending on two names being equal.
+So every package takes a distinct dev address (`0xB4A1D`, `0xCEE`, `0x57AB1E`,
+...). The rule exists to stop a package quietly depending on two names being
+equal.
 
-This is also the deployment difference in miniature. Sui publishes one package
-per transaction and gives each its own id, so `braid_cpmm`'s dependency on
-`braid_math` becomes an on-chain pin at deploy time and `scripts/deploy.sh`
-rewrites the manifest. Aptos publishes a package set under one account, so the
-local path dependency stays a local path dependency and there is nothing to
-rewrite.
+An earlier version of this note called that a test-only formality, on the
+theory that at publish time every name resolves to one account again. That is
+wrong, and the first real publish showed it:
+
+```
+Move abort in 0x1::code: EMODULE_NAME_CLASH(0x80001): Package contains
+duplicate module names with existing modules publised in other packages on
+this address
+```
+
+Aptos identifies a module by `(address, name)`. `braid_cpmm`, `braid_stable`
+and `braid_clmm` each have a module called `pool`. Under one account the
+second of them is an attempt to redefine the first, and `code::check_coexistence`
+refuses it. The dev-address rule was pointing at exactly this: these packages
+*cannot* all live at one address.
+
+So `scripts/aptos.py` publishes each package to its own resource account,
+derived from the publisher with the package name as seed
+(`aptos move create-resource-account-and-publish-package`). The publisher pays
+for all seven, the named addresses are known before anything is sent, and the
+signer capability is discarded at publish, so nobody holds the keys and the
+code cannot be upgraded. That is the shape Sui gives for free, where each
+package gets its own id. The two chains end up deploying the same way. The
+difference is that Sui's layout is unavoidable, while on Aptos you have to
+choose it, and here there was no other option.
 
 ### The framework must match the CLI
 
@@ -366,10 +394,11 @@ reporting and is not load-bearing.
 
 Sui's `create_pool` returns `Coin<LP<A, B>>` so a programmable transaction block
 can thread it into a later command; `create_pool_entry` is the non-composable
-convenience form for a plain CLI call. Aptos has no PTBs — an entry function
-returns nothing and composition happens inside Move. So the wrapper is not a
-convenience over composition, it is the *only* callable form, and the
-value-returning version exists for other Move modules rather than for the client:
+convenience form for a plain CLI call. Aptos has no PTBs, and an entry function
+returns nothing. So for a plain transaction the wrapper is not a convenience
+over composition: it is the *only* callable form. The value-returning version
+exists for other Move code, meaning modules and also the transaction scripts
+described under [the router](#the-router-and-the-transaction-script):
 
 ```move
 public entry fun create_pool_entry<A, B>(
@@ -392,7 +421,10 @@ return values, and GraphQL's `simulateTransaction` wants a protobuf-shaped
 transaction rather than serialized BCS. Aptos has `#[view]`, which a fullnode
 evaluates against live state and returns as JSON, with no transaction and no gas.
 Every quote and reserve accessor on the Aptos pools carries it. The off-chain
-quote engine's on-chain anchor is genuinely easier on this side.
+quote engine's on-chain anchor is genuinely easier on this side, and it is
+wired: before `scripts/aptos.py route` sends anything, it reads each venue's
+`#[view]` quote at the planned amount and compares it with the Rust plan. On a
+localnet run all three quoting venues matched to the unit.
 
 ### Tests
 
@@ -456,26 +488,103 @@ One line of Sui did not come across: `public struct LP<phantom A, phantom B>`,
 declared in the CLMM pool and never used -- concentrated positions are keyed
 records, not tokens. A port is the wrong moment to copy dead code forward.
 
-## What is not ported
+## The router, and the transaction script
 
-`braid_router`. Not for want of effort — it is the one place where the property
-the Sui code relies on does not exist on the other chain.
+An earlier version of this note left `braid_router` on Sui. Its argument
+went: `Route` is a hot potato with no abilities, so a PTB that calls `begin`
+cannot complete without handing the route to `finish`, where `min_out` is
+enforced on the *total*. Aptos has no PTBs, so the route would have to run
+inside one Move function, and the guarantee would drop from a type property
+to a control-flow one.
 
-`Route` is a hot potato: no abilities, so a PTB that calls `begin` cannot
-complete without handing it to `finish`, which is where `min_out` is enforced on
-the *total* rather than per leg. The type system holds a partially-built
-transaction hostage until the bound is checked. Aptos has no PTBs, so there is
-no partially-built transaction to hold — the whole route would execute inside
-one Move function instead. The safety property survives, but it stops being a
-*type* property and becomes an ordinary control-flow one, which is a real
-downgrade in what the compiler proves rather than a change of spelling.
+The premise was wrong. Aptos has no PTBs, but it has what PTBs generalise: a
+transaction can carry a compiled Move **script**, whose `main` calls public
+functions in sequence with values flowing between them. A script is
+bytecode-verified like a module, so a value with no `drop` created in `main`
+must be consumed before `main` returns. `move/aptos/braid_router/scripts/route_a_to_b.move`
+is the Sui PTB, almost line for line:
 
-The irony, noted above: Aptos ships `FungibleAsset` on exactly this trick. The
-pattern is available; what is missing is a caller-assembled transaction for it
-to constrain.
+```move
+let r = route::begin<A, B>(coin::withdraw<A>(trader, total), min_out);
+route::cpmm_a_to_b(&mut r, cpmm_pool, cpmm_amount);
+route::stable_a_to_b(&mut r, stable_pool, stable_amount);
+route::clmm_a_to_b(&mut r, clmm_pool, clmm_amount);
+route::clob_quote_to_base<B, A>(&mut r, trader, market, clob_amount);
+let (out, unspent) = route::finish(r);
+```
 
-Nothing is deployed to Aptos testnet yet; the Sui addresses in the README remain
-the only live deployment.
+Remove the `finish` line and the script does not compile:
+
+```
+error: local `r` of type `route::Route<A, B>` does not have the `drop` ability
+```
+
+A hand-assembled script that skipped the compiler would fail the verifier's
+equivalent check instead. The guarantee is the type system's, just as on Sui.
+The irony an earlier draft noted still holds: `FungibleAsset` is built on the
+same trick. It was never the pattern that was missing.
+
+What did change:
+
+- **Venues are addresses.** A leg takes `pool: address` rather than
+  `&mut Pool<A, B>`, so pointing the constant-product leg at the stable pool
+  aborts at runtime with `ENoSuchPool` rather than failing to resolve. On Sui
+  it could never have been sent at all. Two tests cover this and have no Sui
+  twin. A zero leg returns before touching its address, so a script can
+  name venues it does not use.
+- **The book legs take `&signer`.** The Aptos market attributes a taker's fills
+  to a signer's address where Sui used the transaction context. In a script
+  the signer is `main`'s first parameter, so this costs nothing.
+- **`Routed` has no sender.** Sui's `finish` reads it from `ctx`. On Aptos it
+  is a field of the transaction the event is in.
+- **Scripts take scalars.** A script argument can be `vector<u8>` and nothing
+  wider, so the leg amounts are four `u64`s rather than a `vector<u64>`. The
+  CLI rejects the vector with an opaque "Failed to parse arg", which takes a
+  while to trace back to the argument type.
+- **A script is not a PTB in one respect that matters for tooling.** A PTB
+  is data, built by the client at send time. A script is compiled against
+  concrete named addresses, so `scripts/aptos.py` recompiles `braid_router`
+  against the live addresses before each run. The type arguments stay generic
+  (`route_a_to_b<A, B>`), so one compiled script serves any pair.
+
+The test world ports cleanly, but one detail differs. Sui's `world(salt)` has to burn
+`salt` transactions so that a second world in one test does not collide with
+the first's object ids. On Aptos every pool is a fresh object anyway, so the
+parameter is kept only so that `buy_eth` has the same signature, which is what
+makes the generated corpus byte-identical.
+
+## Deployment
+
+`scripts/aptos.py` does the whole deployment: it publishes the seven packages
+to per-package resource accounts, seeds the four venues, and routes an order.
+The seeding is itself a script, `seed_world.move`, which builds
+`test_world::world` on chain in one transaction: the same pools at the same
+reserves, and the same five resting orders. That is what turns the route into a
+check rather than a demo. `braid-route --test-world` plans against the Rust
+copy of that world *before* anything is sent, the order goes out with `min_out`
+equal to the predicted total, and each `LegExecuted` event is compared with
+the plan.
+
+Against a localnet (`aptos node run-localnet`), end to end:
+
+| Venue | In (plan) | In (chain) | Out (plan) | Out (chain) |
+|---|---:|---:|---:|---:|
+| CPMM | 8,192 | 8,192 | 8,160 | 8,160 |
+| StableSwap | 1,867,704 | 1,867,704 | 1,863,389 | 1,863,389 |
+| CLMM | 120,904 | 120,904 | 120,455 | 120,455 |
+| CLOB | 6,003,200 | 6,003,200 | 5,994,000 | 5,994,000 |
+| **Total** | **8,000,000** | | **7,986,004** | **7,986,004** |
+
+That is `optimized_route_0` from the generated corpus: the same plan, run
+through a real node rather than the unit-test VM. Testnet is the same command
+with a funded publisher. The faucet now hands out APT only through a browser,
+so that step cannot be scripted:
+
+```bash
+aptos init --profile braid-testnet --network testnet
+# fund it at https://aptos.dev/network/faucet
+python scripts/aptos.py all 8000000
+```
 
 ## What turned out not to be a difference
 
