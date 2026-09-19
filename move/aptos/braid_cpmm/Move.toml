@@ -8,17 +8,17 @@ braid_cpmm = "_"
 
 # Every named address in the graph needs a *distinct* dev value: Aptos rejects
 # a dev assignment that collides with another, so that a package is guaranteed
-# to compile under any real address assignment. At publish time they all become
-# one account again -- this constraint exists only to keep the tests honest.
+# to compile under any real address assignment. It is not only for the tests:
+# the live packages must be at distinct addresses too, because three of them
+# have a module called `pool` and Aptos keys a module by (address, name).
+# scripts/aptos.py gives each package its own resource account.
 [dev-addresses]
 braid_cpmm = "0xCEE"
 braid_math = "0xB4A1D"
 
 [dependencies]
-# Local, and it stays local. On Sui this line becomes an on-chain dependency at
-# deploy time, because Sui publishes one package per transaction and gives each
-# its own id. Aptos publishes a whole package set under one account and resolves
-# `braid_math` to that same account, so there is nothing to rewrite.
+# Local, and it stays local. At publish time `braid_math` resolves through
+# --named-addresses to wherever it was published, so nothing here is rewritten.
 braid_math = { local = "../braid_math" }
 
 [dependencies.AptosFramework]

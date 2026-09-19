@@ -1,0 +1,15 @@
+[package]
+name = "braid_test_coins"
+version = "0.1.0"
+license = "Apache-2.0"
+
+[addresses]
+braid_test_coins = "_"
+
+[dev-addresses]
+braid_test_coins = "0x7E57"
+
+[dependencies.AptosFramework]
+git = "https://github.com/aptos-labs/aptos-core.git"
+subdir = "aptos-move/framework/aptos-framework"
+rev = "aptos-cli-v7.2.0"

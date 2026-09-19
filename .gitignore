@@ -17,6 +17,10 @@ node_modules/
 .env
 *.key
 sui.keystore
+.aptos/
+
+# A localnet deployment is thrown away with the node.
+deployments/aptos-local.json
 client.yaml
 
 # OS / editor noise
@@ -28,3 +32,6 @@ Thumbs.db
 # Personal study notes -- a learning/reference resource, not part of the repo.
 # Regenerate or edit freely; nothing here is imported by the build.
 study/
+
+# Python bytecode (bench/gas.py imports the scripts/ modules)
+__pycache__/

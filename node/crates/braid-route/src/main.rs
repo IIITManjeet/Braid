@@ -1,14 +1,50 @@
 //! Plan a route against a snapshot.
 //!
 //!   cargo run -p braid-route -- <snapshot.json> <amount_in> [slippage_bps] [plan.json]
+//!   cargo run -p braid-route -- --test-world <amount_in>
 //!
 //! Prints the split and, if a path is given, writes the plan that
 //! `scripts/route.py execute` turns into one PTB.
 
 use std::process::ExitCode;
 
+/// `--test-world <amount_in>`: plan against `fixtures::router_test_world` and
+/// print the plan as JSON, legs in `[cpmm, stable, clmm, clob]` order.
+///
+/// The Aptos deployment seeds its venues to exactly that world, so a plan
+/// made here offline is a prediction of what the live chain pays, to the unit.
+fn plan_test_world(amount_in: u64) -> ExitCode {
+    let venues = braid_route::fixtures::router_test_world();
+    let plan = braid_route::optimize(&venues, amount_in);
+    let mut amounts = [0u64; 4];
+    let mut legs = serde_json::Map::new();
+    for leg in &plan.legs {
+        amounts[leg.venue] = leg.amount;
+        legs.insert(
+            venues[leg.venue].kind().to_string(),
+            serde_json::json!({ "amount": leg.amount, "spent": leg.spent, "out": leg.out }),
+        );
+    }
+    let json = serde_json::json!({
+        "amountIn": amount_in,
+        "amounts": amounts,
+        "legs": legs,
+        "totalOut": plan.total_out,
+        "unspent": plan.unspent,
+    });
+    println!("{}", serde_json::to_string_pretty(&json).unwrap());
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if args.len() == 2 && args[0] == "--test-world" {
+        let Ok(amount_in) = args[1].parse::<u64>() else {
+            eprintln!("amount_in must be a u64");
+            return ExitCode::FAILURE;
+        };
+        return plan_test_world(amount_in);
+    }
     if args.len() < 2 {
         eprintln!("usage: braid-route <snapshot.json> <amount_in> [slippage_bps] [plan.json]");
         return ExitCode::FAILURE;
