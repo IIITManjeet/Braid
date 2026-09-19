@@ -1,0 +1,79 @@
+{
+  "chain": "aptos",
+  "network": "local",
+  "amount": 100000,
+  "rows": [
+    {
+      "route": "empty route",
+      "legs": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "gasUnits": 13,
+      "gasUnitPrice": 100,
+      "tx": "0x34f96dd476e19dbeb11b418e1fde918c19e8d250cd21e0b67cebe28dde402c6a"
+    },
+    {
+      "route": "cpmm",
+      "legs": [
+        100000,
+        0,
+        0,
+        0
+      ],
+      "gasUnits": 17,
+      "gasUnitPrice": 100,
+      "tx": "0x6309a10938737d8d1e36c60dab379cfa3eb975715f29dee3f61dca4d56ecc777"
+    },
+    {
+      "route": "stable",
+      "legs": [
+        0,
+        100000,
+        0,
+        0
+      ],
+      "gasUnits": 18,
+      "gasUnitPrice": 100,
+      "tx": "0xbe2856d369787ab22f2546bf1c70532b18ea96c7b17ef53bc9bfd1ec199758e6"
+    },
+    {
+      "route": "clmm",
+      "legs": [
+        0,
+        0,
+        100000,
+        0
+      ],
+      "gasUnits": 23,
+      "gasUnitPrice": 100,
+      "tx": "0xd33e4b4d7e3062105e8e965e2d823bc4acfd5030a7a6fb25a52920bc0206d6cb"
+    },
+    {
+      "route": "clob",
+      "legs": [
+        0,
+        0,
+        0,
+        100000
+      ],
+      "gasUnits": 17,
+      "gasUnitPrice": 100,
+      "tx": "0xeafcaba6622f774047980e277da36a36174d2240e96a68db3004486b66f6a941"
+    },
+    {
+      "route": "all four",
+      "legs": [
+        25000,
+        25000,
+        25000,
+        25000
+      ],
+      "gasUnits": 29,
+      "gasUnitPrice": 100,
+      "tx": "0x37f959849a3648163a802d1d05f49cfa5754e11124bf8e34f840d10ffcc23c20"
+    }
+  ]
+}

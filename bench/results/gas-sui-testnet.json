@@ -1,0 +1,86 @@
+{
+  "chain": "sui",
+  "network": "testnet",
+  "amount": 100000,
+  "dryRun": true,
+  "rows": [
+    {
+      "route": "empty route",
+      "legs": [
+        0,
+        0,
+        0,
+        0
+      ],
+      "computationCost": 1000000,
+      "storageCost": 5335200,
+      "storageRebate": 1685376,
+      "net": 4649824
+    },
+    {
+      "route": "cpmm",
+      "legs": [
+        100000,
+        0,
+        0,
+        0
+      ],
+      "computationCost": 1000000,
+      "storageCost": 7562000,
+      "storageRebate": 3889908,
+      "net": 4672092
+    },
+    {
+      "route": "stable",
+      "legs": [
+        0,
+        100000,
+        0,
+        0
+      ],
+      "computationCost": 1000000,
+      "storageCost": 7668400,
+      "storageRebate": 3995244,
+      "net": 4673156
+    },
+    {
+      "route": "clmm",
+      "legs": [
+        0,
+        0,
+        100000,
+        0
+      ],
+      "computationCost": 1000000,
+      "storageCost": 9264400,
+      "storageRebate": 5575284,
+      "net": 4689116
+    },
+    {
+      "route": "clob",
+      "legs": [
+        0,
+        0,
+        0,
+        100000
+      ],
+      "computationCost": 1000000,
+      "storageCost": 10450000,
+      "storageRebate": 6749028,
+      "net": 4700972
+    },
+    {
+      "route": "all four",
+      "legs": [
+        25000,
+        25000,
+        25000,
+        25000
+      ],
+      "computationCost": 1000000,
+      "storageCost": 18939200,
+      "storageRebate": 15153336,
+      "net": 4785864
+    }
+  ]
+}

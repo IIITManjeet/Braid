@@ -44,7 +44,10 @@ def sui(*args):
     exe = shutil.which("sui", path=path)
     if exe is None:
         raise SystemExit("sui not found -- run scripts/get-sui.sh")
-    out = subprocess.run([exe, *args], capture_output=True, text=True, env=dict(os.environ, PATH=path))
+    # UTF-8 explicitly: the CLI draws tables with box characters, and on Windows
+    # `text=True` would decode them with the ANSI codepage and fail.
+    out = subprocess.run([exe, *args], capture_output=True, text=True, encoding="utf-8",
+                         errors="replace", env=dict(os.environ, PATH=path))
     raw = out.stdout
     i = raw.find("{")
     if i < 0:
