@@ -867,9 +867,11 @@ fn main() {
         &gen_clob(&mut Rng(SEED ^ 0xC10B_u64), n / 8, Dialect::Aptos),
     );
 
-    // The router is Sui-only for now; see docs/aptos-port.md.
-    write(
-        "../move/sui/braid_router/tests/generated_route_diff_tests.move",
+    // Dialect-neutral too, though it executes whole routes: every case is one
+    // call into `test_world::buy_eth`, and each tree's test world keeps that
+    // signature. The chain-specific setup lives there, not here.
+    write_both(
+        "braid_router/tests/generated_route_diff_tests.move",
         &gen_routes(&mut rng_routes, n / 16),
     );
 
