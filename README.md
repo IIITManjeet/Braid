@@ -119,6 +119,8 @@ move/sui/braid_clob/     central limit order book                               
 move/sui/braid_router/   atomic multi-venue route execution                        [done]
 move/aptos/*             phase 2: the port -- all six, plus test coins and scripts [done]
 node/crates/             Rust: replica, difftest generator, route optimizer, bench  [done]
+node/crates/braid-server Rust: the quote, route and deployment API                 [done]
+web/                     Next.js front end -- route explorer, deployments, bench    [done]
 bench/                   gas costs per venue on both chains, p99 quote latency      [done]
 docs/                    design notes, invariant derivations
 ```
@@ -256,6 +258,68 @@ python scripts/aptos.py all 8000000    # testnet: needs a funded `braid-testnet`
 
 Full comparison: [docs/aptos-port.md](docs/aptos-port.md).
 
+## The web front end
+
+```bash
+bash scripts/web.sh          # API on :8080, page on http://localhost:3000
+bash scripts/web.sh --dev    # same, with Next's hot reloading
+```
+
+Two processes, because they are two different things.
+
+`node/crates/braid-server` is a thin axum shell over `braid-quote` and
+`braid-route` -- the same crates the differential fuzzer checks against both
+Move VMs. It owns no pricing of its own, so a number on the page is a number
+the generated Move tests are holding the chain to. Reimplementing any of it in
+TypeScript would throw the guarantee away, so none of it is.
+
+`web/` is a Next.js app that draws it, and proxies `/api/*` to the server so
+the page is same-origin. Five views:
+
+- **Route** -- enter an order and watch it split. The leg table shows each
+  venue's allocation, what it actually consumed, and its *marginal* rate: the
+  output for one more unit there, per unit consumed. The optimizer stops when
+  those are as equal as an integer staircase permits, so the table is the
+  argument, not a summary of it. Idle venues show what they would pay for the
+  next unit -- if one of those were above a leg in use, the split would be
+  wrong. The chart plots effective price, output per unit of input, across four
+  decades of order size: the book is worthless below one lot and steps as lots
+  fill, and the concentrated pool falls away where it runs out of range.
+- **Venues** -- the state each venue prices from: reserves, every initialized
+  tick, every resting book level.
+- **Deployments** -- the Sui testnet packages, pools and the transactions that
+  exercised them, with explorer links, plus the Aptos deployments.
+- **Benchmarks** -- gas per venue, one chart per chain. Never one chart with
+  two axes: MIST and Aptos gas units are different measures. The bars show each
+  route's cost *over an empty route*, because the fixed per-transaction cost is
+  most of the Sui number and plotting totals hides the venues entirely.
+- **Verification** -- the generated corpora, counted from the committed files
+  at request time rather than quoted from this README, and whether each pair of
+  Sui/Aptos files is byte-identical.
+
+**Venue state comes from one of two places.** The *router test world* is the
+fixture the generated route tests run against, and the state the Aptos
+deployment seeds to -- reproducible, offline, and not executable because there
+is no object to point at. *Sui testnet* starts from the snapshot committed
+under `deployments/routes/`, which is what the first four-venue route was
+planned against; that route moved those pools, so the page labels it a record
+rather than current state. **Refresh chain** re-reads the venues through
+`scripts/route.py snapshot` and replaces it.
+
+**Executing.** With a live snapshot and a Sui wallet, the page builds the same
+programmable transaction `scripts/route.py execute` does -- mint the input,
+`begin`, one call per leg, `finish`, transfer back -- and hands it to the
+wallet through dApp Kit. `Route` has no abilities, so a PTB that opens one
+cannot be built without the `finish` that enforces `min_out` on the total; the
+page cannot omit that check even if it wanted to. The input coin is minted in
+the same transaction that spends it, which works only because
+`braid_test_coins` shares its `TreasuryCap` on purpose -- testnet faucet
+behaviour, documented in that package as never-on-mainnet. A transaction the
+chain rejects still comes back with a digest, and the page says so rather than
+reporting success: a route that cannot pay its `min_out` aborts whole. The
+exact `sui client ptb` command is shown beside the button, which is also the
+path when no wallet is installed.
+
 ## Benchmarks
 
 [`bench/`](bench) measures gas per venue on both chains and the replica's quote latency.
@@ -294,6 +358,9 @@ an older compiler. Bump them as a pair.
 
 Also required: Rust (1.96+) and Node 18+.
 
+The front end needs Node 18+ as well; `scripts/web.sh` installs its
+dependencies on first run.
+
 Every package's tests, in one go:
 
 ```bash
@@ -318,4 +385,5 @@ bash scripts/test-aptos.sh      # Aptos: 574 Move tests
 - [x] Aptos port: `braid_router`, with transaction scripts in place of PTBs (36 tests)
 - [x] Aptos deployment tooling: per-package resource accounts, seeding, a verified route (localnet)
 - [x] Benchmarks: gas per venue on both chains, quote and planning latency
+- [x] Web front end: Rust quote/route API, Next.js page, wallet execution
 - [ ] Run `scripts/aptos.py all` on testnet -- needs APT from the browser-only faucet
