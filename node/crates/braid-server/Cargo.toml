@@ -1,0 +1,17 @@
+[package]
+name = "braid-server"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+
+[dependencies]
+# The replica and the optimizer, used directly -- the server is a thin HTTP
+# shell over the same code the differential fuzzer checks against the chain.
+braid-quote = { path = "../braid-quote" }
+braid-route = { path = "../braid-route" }
+
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal"] }
+tower-http = { version = "0.6", features = ["fs", "trace", "cors"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

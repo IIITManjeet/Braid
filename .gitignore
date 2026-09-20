@@ -35,3 +35,12 @@ study/
 
 # Python bytecode (bench/gas.py imports the scripts/ modules)
 __pycache__/
+
+# Local working memory -- session state, funding status, running notes.
+# Untracked on purpose: it records what *this machine* has done, not the repo.
+NOTES.local.md
+.braid-local/
+
+# Live snapshot the web server writes when it re-reads the chain. Scratch:
+# the committed first-route snapshot is the one that is a record.
+deployments/routes/.live-snapshot.json
