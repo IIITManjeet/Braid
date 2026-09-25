@@ -8,6 +8,7 @@ import { asCliCommand } from '@/lib/buildRoute';
 import { fmt } from '@/lib/format';
 import { venueColor, venueLabel } from '@/lib/venues';
 import { Card, Swatch, useToast } from '@/components/ui';
+import { useWorld } from '@/components/WorldProvider';
 
 // Wallet discovery is a browser handshake, and dApp Kit reads browser storage
 // to remember the last wallet. Neither exists during server rendering.
@@ -53,18 +54,26 @@ export default function ExecutePanel({ plan, world }: { plan: Plan; world: World
         </>
       }
     >
-      {!plan.live ? (
-        <div className="banner inset">
-          <strong>Stale state. </strong>
-          This plan was made against the committed snapshot, which is older than the pools. Use
-          “Refresh chain” before executing, or the <code>min_out</code> will almost certainly abort.
-        </div>
-      ) : null}
+      {!plan.live ? <StaleWarning /> : null}
 
       <WhatGetsSigned plan={plan} call={call} />
       <WalletSection plan={plan} call={call} />
       <CliFallback command={asCliCommand(call)} />
     </Card>
+  );
+}
+
+function StaleWarning() {
+  const { canRefresh } = useWorld();
+  return (
+    <div className="banner inset">
+      <strong>Stale state. </strong>
+      This plan was made against the committed snapshot, which is older than the pools, so its{' '}
+      <code>min_out</code> will almost certainly abort.{' '}
+      {canRefresh
+        ? 'Use “Refresh chain” before executing.'
+        : 'Reading live state needs the Sui CLI, which this deployment does not carry — run it locally with bash scripts/web.sh to execute.'}
+    </div>
   );
 }
 

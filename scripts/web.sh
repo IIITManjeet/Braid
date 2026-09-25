@@ -45,9 +45,18 @@ if [ ! -d "$ROOT/web/node_modules" ]; then
 fi
 
 # `next start` serves a build; `next dev` compiles on demand.
-if [ "$next_cmd" = start ] && [ ! -d "$ROOT/web/.next" ]; then
-  echo "building the page..."
-  (cd "$ROOT/web" && npm run build)
+#
+# The /api/* rewrite is baked into the build, not read at runtime, so a build
+# made against one API port keeps pointing at it. Record which port a build was
+# made for and rebuild when it changes, or a stale .next silently proxies
+# somewhere nothing is listening.
+stamp="$ROOT/web/.next/.braid-api-port"
+if [ "$next_cmd" = start ]; then
+  if [ ! -d "$ROOT/web/.next" ] || [ "$(cat "$stamp" 2>/dev/null || true)" != "$API_PORT" ]; then
+    echo "building the page for API port $API_PORT..."
+    (cd "$ROOT/web" && BRAID_API="http://127.0.0.1:$API_PORT" npm run build)
+    echo "$API_PORT" > "$stamp"
+  fi
 fi
 
 echo "building braid-server..."

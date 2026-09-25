@@ -349,6 +349,11 @@ pub async fn difftest(State(s): State<Arc<AppState>>) -> Json<Value> {
 /// what makes execution safe: a plan built against the committed snapshot would
 /// name a `min_out` the pools have since moved away from.
 pub async fn refresh(State(s): State<Arc<AppState>>) -> Res {
+    if !repo::can_refresh(&s.root) {
+        return Err(bad(
+            "this deployment cannot read live chain state: it needs Python and the Sui CLI, neither of which is installed here",
+        ));
+    }
     let root = s.root.clone();
     let out = root.join("deployments").join("routes").join(".live-snapshot.json");
     let target = out.clone();
@@ -365,5 +370,11 @@ pub async fn refresh(State(s): State<Arc<AppState>>) -> Res {
 }
 
 pub async fn health(State(s): State<Arc<AppState>>) -> impl IntoResponse {
-    Json(json!({ "ok": true, "root": s.root.display().to_string() }))
+    Json(json!({
+        "ok": true,
+        "root": s.root.display().to_string(),
+        // The page hides its refresh control when this is false, rather than
+        // offering one that cannot work.
+        "canRefresh": repo::can_refresh(&s.root),
+    }))
 }

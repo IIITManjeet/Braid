@@ -377,6 +377,43 @@ The Sui side talks **gRPC**, not JSON-RPC: public fullnodes have retired their
 JSON-RPC methods, and building a transaction against one now fails with
 `Method not found`.
 
+## Deploying it
+
+```bash
+docker build -t braid .
+docker run -p 3000:3000 braid      # http://localhost:3000
+```
+
+One image, both processes, one origin. The API and the page run side by side
+behind port 3000, so `/api/*` is same-origin exactly as it is locally, and
+`docker-entrypoint.sh` treats either process exiting as the container exiting --
+a half-running Braid serves pages whose every number is an error, which is worse
+than being down and restarted.
+
+Alpine throughout, so the API is a static musl binary; nothing in
+`braid-server` links C. The image carries `deployments/`, `bench/results/` and
+`move/` because the API reads them at request time -- the verification page
+counts the generated corpora from the files rather than repeating a number, and
+that should stay true inside the image.
+
+**What the deployed build cannot do is read live chain state.** That needs the
+Sui CLI, which is ~800MB and vendored rather than installed. Rather than ship a
+button that fails, the server reports the capability from `/api/health` and the
+page hides its refresh control and says where to get it:
+
+```bash
+bash scripts/web.sh    # locally, with the CLI: live reads and executable routes
+```
+
+The committed snapshot and the offline router test world work either way, so
+the explorer, the deployments, the benchmarks and the verification counts are
+all fully live on the deployed site.
+
+Two host configs are checked in, both free-tier:
+[`render.yaml`](render.yaml) (Blueprint; sleeps when idle and cold-starts on the
+next request) and [`fly.toml`](fly.toml) (`fly deploy`; scales to zero). The
+image is host-agnostic -- anything that runs a container will do.
+
 ## Benchmarks
 
 [`bench/`](bench) measures gas per venue on both chains and the replica's quote latency.

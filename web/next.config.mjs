@@ -12,6 +12,12 @@ const API = process.env.BRAID_API ?? 'http://127.0.0.1:8080';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Standalone output -- a server carrying only the modules it imports -- is
+  // what keeps the container small, but `next start` refuses to serve it. So
+  // it is opt-in: the Dockerfile sets BRAID_STANDALONE, and a local
+  // `npm run start` gets an ordinary build.
+  output: process.env.BRAID_STANDALONE ? 'standalone' : undefined,
+
   async rewrites() {
     return [{ source: '/api/:path*', destination: `${API}/api/:path*` }];
   },

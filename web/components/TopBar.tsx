@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useWorld } from './WorldProvider';
 
 export default function TopBar() {
-  const { worlds, world, worldId, setWorldId, refresh, refreshing } = useWorld();
+  const { worlds, world, worldId, setWorldId, refresh, refreshing, canRefresh } = useWorld();
 
   return (
     <>
@@ -45,15 +45,17 @@ export default function TopBar() {
             </select>
           </label>
 
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={refresh}
-            disabled={refreshing}
-            title="Re-read live Sui pool state through scripts/route.py"
-          >
-            {refreshing ? 'Reading chain…' : 'Refresh chain'}
-          </button>
+          {canRefresh ? (
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={refresh}
+              disabled={refreshing}
+              title="Re-read live Sui pool state through scripts/route.py"
+            >
+              {refreshing ? 'Reading chain…' : 'Refresh chain'}
+            </button>
+          ) : null}
 
           <ThemeToggle />
         </div>
@@ -65,7 +67,7 @@ export default function TopBar() {
 }
 
 function Banner() {
-  const { world, refresh, refreshing } = useWorld();
+  const { world, refresh, refreshing, canRefresh } = useWorld();
   if (!world) return null;
 
   if (world.live) {
@@ -81,9 +83,16 @@ function Banner() {
       <div className="banner">
         <strong>Historical snapshot. </strong>
         {world.description}{' '}
-        <button type="button" className="btn ghost sm" onClick={refresh} disabled={refreshing}>
-          Refresh now
-        </button>
+        {canRefresh ? (
+          <button type="button" className="btn ghost sm" onClick={refresh} disabled={refreshing}>
+            Refresh now
+          </button>
+        ) : (
+          <>
+            Reading live state needs the Sui CLI, which this deployment does not carry — run it
+            locally with <code>bash scripts/web.sh</code> for that.
+          </>
+        )}
       </div>
     );
   }

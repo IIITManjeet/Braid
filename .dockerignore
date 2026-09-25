@@ -1,0 +1,27 @@
+# Build output and caches. The image builds these itself.
+# No trailing slashes: Docker matches these with Go path patterns, where a
+# trailing slash does not reliably match a directory. move/ alone is 322MB of
+# Move build artefacts against 2.2MB of source, so this one matters.
+**/target
+**/node_modules
+**/.next
+**/build
+**/__pycache__
+
+# The vendored Sui and Aptos CLIs, ~800MB. The deployed server serves the
+# committed snapshot instead of shelling out to them; see repo::can_refresh.
+.tools
+
+# Keys and local state -- never in an image.
+.aptos
+.env
+*.key
+sui.keystore
+deployments/aptos-local.json
+deployments/routes/.live-snapshot.json
+NOTES.local.md
+
+# Not needed at runtime.
+.git
+study
+docs

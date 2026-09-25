@@ -1,0 +1,24 @@
+# Braid on Render's free plan.
+#
+#   Render dashboard -> New -> Blueprint -> point it at this repository.
+#
+# Free web services sleep after a stretch with no traffic and cold-start on the
+# next request, which for a project page is the right trade: it costs nothing
+# and the first visitor waits a few seconds. Check Render's current free-plan
+# terms before relying on it.
+#
+# The service is stateless. Every number it serves is either baked into the
+# image or computed by the Rust replica on the spot, so there is nothing to
+# persist and a restart loses nothing.
+
+services:
+  - type: web
+    name: braid
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    # Hits the Rust API through the page's own proxy, so a green check means
+    # both processes are up, not just the one listening publicly.
+    healthCheckPath: /api/health
+    autoDeploy: true

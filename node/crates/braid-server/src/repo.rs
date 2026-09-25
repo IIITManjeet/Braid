@@ -164,6 +164,34 @@ pub fn difftest(root: &Path) -> Value {
     })
 }
 
+/// Whether this deployment can read live Sui state.
+///
+/// Reading it means running `scripts/route.py snapshot`, which needs Python and
+/// the Sui CLI. The CLI is ~800MB and vendored rather than installed, so it
+/// does not travel into a container: a deployed build serves the committed
+/// snapshot and says so, rather than offering a button that fails.
+pub fn can_refresh(root: &Path) -> bool {
+    if !root.join("scripts").join("route.py").is_file() {
+        return false;
+    }
+    on_path(&python()) && (on_path("sui") || root.join(".tools").join(SUI_EXE).is_file())
+}
+
+#[cfg(windows)]
+const SUI_EXE: &str = "sui.exe";
+#[cfg(not(windows))]
+const SUI_EXE: &str = "sui";
+
+/// `--version` is the cheapest question every one of these answers.
+fn on_path(program: &str) -> bool {
+    std::process::Command::new(program)
+        .arg("--version")
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .is_ok_and(|s| s.success())
+}
+
 /// Re-read live Sui venue state by running `scripts/route.py snapshot`.
 ///
 /// Shelling out rather than reimplementing: that script already decodes the

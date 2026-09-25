@@ -97,9 +97,10 @@ pub fn from_snapshot_file(path: &Path, live: bool, source: String) -> Result<Wor
         description: if live {
             "Live state, read from the chain just now. Safe to execute against.".into()
         } else {
+            // No instruction to refresh here: whether that is even possible
+            // depends on the deployment, and the page says so where it knows.
             "The snapshot the first four-venue route was planned against. That route \
-             moved these pools, so this is a record, not current state -- refresh \
-             before executing."
+             moved these pools, so this is a record rather than current state."
                 .into()
         },
         snapshot,

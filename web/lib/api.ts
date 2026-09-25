@@ -188,6 +188,15 @@ const post = <T,>(path: string, body: unknown) =>
     body: JSON.stringify(body),
   });
 
+export type Health = {
+  ok: boolean;
+  root: string;
+  /** False where the Sui CLI is not installed, as in a deployed container. */
+  canRefresh: boolean;
+};
+
+export const getHealth = () => req<Health>('/api/health');
+
 export const getWorlds = () => req<{ worlds: World[] }>('/api/worlds').then((r) => r.worlds);
 
 export const getRoute = (world: string, amountIn: number, slippageBps: number) =>

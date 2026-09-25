@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import { getWorlds, refreshChain, type World } from '@/lib/api';
+import { getHealth, getWorlds, refreshChain, type World } from '@/lib/api';
 import { useToast } from './ui';
 
 type WorldState = {
@@ -22,6 +22,8 @@ type WorldState = {
   error: string | null;
   refreshing: boolean;
   refresh: () => Promise<void>;
+  /** Whether this server can read live chain state at all. */
+  canRefresh: boolean;
 };
 
 const Context = createContext<WorldState | null>(null);
@@ -40,6 +42,9 @@ export function WorldProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Assumed false until the server says otherwise, so a deployed build never
+  // flashes a control it cannot honour.
+  const [canRefresh, setCanRefresh] = useState(false);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -54,6 +59,10 @@ export function WorldProvider({ children }: { children: ReactNode }) {
     // first render, and localStorage does not exist during it.
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored) setWorldIdState(stored);
+
+    getHealth()
+      .then((h) => setCanRefresh(h.canRefresh))
+      .catch(() => setCanRefresh(false));
 
     load()
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
@@ -89,8 +98,9 @@ export function WorldProvider({ children }: { children: ReactNode }) {
       error,
       refreshing,
       refresh,
+      canRefresh,
     }),
-    [worlds, worldId, setWorldId, loading, error, refreshing, refresh],
+    [worlds, worldId, setWorldId, loading, error, refreshing, refresh, canRefresh],
   );
 
   return <Context.Provider value={value}>{children}</Context.Provider>;
