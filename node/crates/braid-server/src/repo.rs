@@ -41,11 +41,15 @@ pub fn deployments(root: &Path) -> Value {
             "local": read_json(&d.join("aptos-local.json")),
             "testnet": read_json(&d.join("aptos-testnet.json")),
         },
+        // Suiscan puts the network in the path; Aptos Explorer wants it as a
+        // query parameter and silently shows mainnet without one, so the
+        // suffix travels with the bases rather than being assumed downstream.
         "explorers": {
             "suiTx": "https://suiscan.xyz/testnet/tx/",
             "suiObject": "https://suiscan.xyz/testnet/object/",
             "aptosTx": "https://explorer.aptoslabs.com/txn/",
             "aptosAccount": "https://explorer.aptoslabs.com/account/",
+            "aptosSuffix": "?network=testnet",
         },
     })
 }

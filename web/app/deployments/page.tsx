@@ -197,7 +197,7 @@ function AptosSection({ d }: { d: Deployments }) {
     <>
       <Card
         title="Aptos"
-        sub="The same six packages on the other Move chain. Aptos keys a module by (address, name), and three packages declare a module called `pool` — so each package gets its own resource account, derived from the publisher."
+        sub="The same packages on the other Move chain, seven of them with the test coins. Aptos keys a module by (address, name), and three packages declare a module called `pool` — so each package gets its own resource account, derived from the publisher."
       >
         {d.aptos?.testnet ? (
           <p className="note">
@@ -251,7 +251,7 @@ function AptosDeployment({
             head: 'Resource account',
             render: (r) =>
               label === 'testnet' ? (
-                <ExternalLink href={ex.aptosAccount + r.address}>
+                <ExternalLink href={ex.aptosAccount + r.address + ex.aptosSuffix}>
                   {shortAddr(r.address, 8)}
                 </ExternalLink>
               ) : (
@@ -287,7 +287,9 @@ function AptosDeployment({
             {label === 'testnet' && r.tx ? (
               <>
                 {' · '}
-                <ExternalLink href={ex.aptosTx + r.tx}>{shortAddr(r.tx, 8)}</ExternalLink>
+                <ExternalLink href={ex.aptosTx + r.tx + ex.aptosSuffix}>
+                  {shortAddr(r.tx, 8)}
+                </ExternalLink>
               </>
             ) : null}
           </p>

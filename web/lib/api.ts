@@ -156,7 +156,14 @@ export type Difftest = {
 export type Deployments = {
   sui: { testnet: any; firstRoutePlan: any; firstRouteSnapshot: any };
   aptos: { local: any; testnet: any };
-  explorers: { suiTx: string; suiObject: string; aptosTx: string; aptosAccount: string };
+  explorers: {
+    suiTx: string;
+    suiObject: string;
+    aptosTx: string;
+    aptosAccount: string;
+    /** Aptos Explorer shows mainnet unless the network is named. */
+    aptosSuffix: string;
+  };
 };
 
 // ---------------------------------------------------------------- client -- //

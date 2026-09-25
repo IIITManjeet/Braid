@@ -1,0 +1,85 @@
+{
+  "_network": "testnet",
+  "_publisher": "0xc03eab60e79733711ec86b65831d5feb29d1f96375889fd054d076edb0b09f8a",
+  "_trader": "0xab763591adfcc4a70cfa14af2fbd1594132bc5c93229a27741a02c18b87066bc",
+  "packages": {
+    "braid_clmm": {
+      "address": "0xc74887e4f07d107c9ca3629842d3ff39bd0ab64eb925d0a39d556cf533738683",
+      "gasUsed": 232993,
+      "tx": "0xc74716bfd9f1045fefaeebcc99fb85411fd36dc7d9930a11372b7ddb641ed202"
+    },
+    "braid_clob": {
+      "address": "0xac3473fcdb11b69b25da30e09ebc603148e471449969f02393f0d35db34436a2",
+      "gasUsed": 153033,
+      "tx": "0x594d4d214ed6deed4ff8bfd326ec49504443816a88ed1c06f9ceda5e35566996"
+    },
+    "braid_cpmm": {
+      "address": "0x2358735c47f17baffc81b9fc1eaed7ac5ab686718104ffe2824bd99aa6db4407",
+      "gasUsed": 83316,
+      "tx": "0x6e17a8d85972bfbb88581ab629d8ab73f68e6fbcbe7dd6f16879a05856b3d17b"
+    },
+    "braid_math": {
+      "address": "0x7e77c22bcaf026ff8f868775f7aa196c97af77c924d9a254ac2b9f816137b391",
+      "gasUsed": 73064,
+      "tx": "0x957db2dfdee4f06b4113fb00c1a22b1a696e74b8e81514e1a956cb732b365745"
+    },
+    "braid_router": {
+      "address": "0x517c197d9a281091a3b49e29c053268b624990f11d51af7d91bfd34154b7f086",
+      "gasUsed": 41389,
+      "tx": "0x84d24d3d5929c7b7f4459ba875b5dead6ba1b10c494e6f179a12f061790dec28"
+    },
+    "braid_stable": {
+      "address": "0xc7c3e8ac52e86f6d6ab33ebfbc9ef6285a5ef8ec8dc4232b177710715d25792b",
+      "gasUsed": 98523,
+      "tx": "0xbde46d86d005deaa1063f3dbfbae17d135fbedd193bc70a40143e099a007ebe8"
+    },
+    "braid_test_coins": {
+      "address": "0xb59b9542d72a82865c5a10c28a73f202cd51f198a5323e75e983c3865c7685a0",
+      "gasUsed": 52477,
+      "tx": "0x202cd3d14367b2886a6f69e3052248bc67672f307dc757f029ffd1f420af90e3"
+    }
+  },
+  "routes": [
+    {
+      "amountIn": 8000000,
+      "amountOut": 7986004,
+      "gasUsed": 10198,
+      "legs": {
+        "clmm": {
+          "in": 120904,
+          "out": 120455
+        },
+        "clob": {
+          "in": 6003200,
+          "out": 5994000
+        },
+        "cpmm": {
+          "in": 8192,
+          "out": 8160
+        },
+        "stable": {
+          "in": 1867704,
+          "out": 1863389
+        }
+      },
+      "matchesPlan": true,
+      "minOut": 7986004,
+      "sender": "0xab763591adfcc4a70cfa14af2fbd1594132bc5c93229a27741a02c18b87066bc",
+      "tx": "0xb7827e4579e47ba3ba788e847a29b09b84977837f0ca2de6b8f7eddc07898716",
+      "unspent": 0
+    }
+  ],
+  "venues": {
+    "clmm": "0x5c5bf215cd7bbeb1db98de7568df183f010e32e773a47a215d0551081f445f77",
+    "clob": "0x29f3a04bfc2d7e4c0a0bf2322d1a7240220fd126d02cd9f06de71070e36c0237",
+    "cpmm": "0x81efd3186431bdf8903083babe95c47754bf9ceb9a0a28770534ba4bec654553",
+    "gasUsed": 150028,
+    "note": "Seeded exactly as braid_router::test_world, so braid-route --test-world predicts this chain.",
+    "pair": [
+      "TUSD",
+      "TETH"
+    ],
+    "seededIn": "0x3f49ddbd81736b548aba99be4a964b696312e44962af79babcd7c3c249478ad7",
+    "stable": "0x74ba5ea91e8c902712896c52ba7d9b8b60e7534c66e59405fc191bd87af2bfe3"
+  }
+}

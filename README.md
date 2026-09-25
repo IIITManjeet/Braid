@@ -247,14 +247,45 @@ Aptos keys modules by `(address, name)`, so they cannot share an account -- the 
 publish aborts with `EMODULE_NAME_CLASH`. [`scripts/aptos.py`](scripts/aptos.py) puts each
 package in its own resource account, seeds the four venues exactly as the router tests do,
 plans a route offline in Rust, checks the live `#[view]` quotes against the plan, and sends
-it with `min_out` equal to the prediction. On a localnet, an 8,000,000 TUSD route through all
-four venues matched the plan to the unit on every leg:
+it with `min_out` equal to the prediction.
 
 ```bash
 bash scripts/get-aptos.sh              # vendors the Aptos CLI into .tools/
 bash scripts/test-aptos.sh
-python scripts/aptos.py all 8000000    # testnet: needs a funded `braid-testnet` profile
+python scripts/aptos.py all 8000000    # needs a funded `braid-testnet` profile
 ```
+
+## Live on Aptos testnet
+
+All seven packages are published, one resource account each, and an 8,000,000
+TUSD route through all four venues
+([`0xb7827e45...`](https://explorer.aptoslabs.com/txn/0xb7827e4579e47ba3ba788e847a29b09b84977837f0ca2de6b8f7eddc07898716?network=testnet))
+matched the plan to the unit on every leg:
+
+| Venue | In | Out |
+|---|---|---|
+| CPMM | 8,192 | 8,160 |
+| StableSwap | 1,867,704 | 1,863,389 |
+| CLMM | 120,904 | 120,455 |
+| CLOB | 6,003,200 | 5,994,000 |
+| **Total** | **8,000,000** | **7,986,004** |
+
+`min_out` was 7,986,004 -- the prediction exactly, so a one-unit shortfall on any
+leg would have aborted the whole transaction. Before sending, each venue's live
+`#[view]` quote was compared with the plan. Publishing all seven packages cost
+734,795 gas units; the route itself cost 10,198.
+
+The venues are seeded to exactly `braid_router::test_world`, so the whole thing
+is a prediction made offline and then checked on chain:
+
+```bash
+cargo run -p braid-route -- --test-world 8000000    # 7986004, before anything is sent
+```
+
+That is the same number the localnet run produced, leg for leg -- and the same
+number the generated route tests hold both Move VMs to. Addresses and
+transactions are in
+[`deployments/aptos-testnet.json`](deployments/aptos-testnet.json).
 
 Full comparison: [docs/aptos-port.md](docs/aptos-port.md).
 
@@ -412,4 +443,4 @@ bash scripts/test-aptos.sh      # Aptos: 574 Move tests
 - [x] Aptos deployment tooling: per-package resource accounts, seeding, a verified route (localnet)
 - [x] Benchmarks: gas per venue on both chains, quote and planning latency
 - [x] Web front end: Rust quote/route API, Next.js page, wallet execution
-- [ ] Run `scripts/aptos.py all` on testnet -- needs APT from the browser-only faucet
+- [x] Aptos testnet: all seven packages published, four-venue route matching the plan
