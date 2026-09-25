@@ -8,13 +8,20 @@
 // offering a network picker that cannot work would be a lie in the UI.
 
 import { createDAppKit } from '@mysten/dapp-kit-core';
-import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from '@mysten/sui/jsonRpc';
+import { SuiGrpcClient } from '@mysten/sui/grpc';
+
+const FULLNODE = {
+  testnet: 'https://fullnode.testnet.sui.io:443',
+} as const;
 
 export const dAppKit = createDAppKit({
   networks: ['testnet'],
   defaultNetwork: 'testnet',
+  // gRPC, not JSON-RPC. Public fullnodes have retired the JSON-RPC methods --
+  // building a transaction against one now fails with "Method not found" --
+  // and the SDK's own guidance is to move to gRPC or GraphQL.
   createClient: (network) =>
-    new SuiJsonRpcClient({ url: getJsonRpcFullnodeUrl(network), network }),
+    new SuiGrpcClient({ network, baseUrl: FULLNODE[network] }),
 
   // The hosted Slush web wallet is off because its metadata endpoint serves no
   // CORS headers, so enabling it means three failed requests and a console

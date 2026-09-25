@@ -320,6 +320,32 @@ reporting success: a route that cannot pay its `min_out` aborts whole. The
 exact `sui client ptb` command is shown beside the button, which is also the
 path when no wallet is installed.
 
+Signing needs a wallet and a wallet needs a person, so that last step cannot be
+covered by a test. Everything before it can:
+
+```bash
+cd web && npm run dry-run        # needs braid-server running
+```
+
+`web/scripts/dry-run-route.mts` reads live venue state, plans an order, builds
+the transaction with `lib/buildRoute.ts` -- the module the page uses, not a copy
+-- and asks the chain to execute it without a signature. Nothing is sent. It
+then compares every `LegExecuted` event against the Rust prediction, the same
+check `scripts/route.py execute` makes after a real send. A recent run, against
+live pools:
+
+```
+venue      in (plan)  in (chain)  out (plan) out (chain)
+cpmm           35984       35984       35247       35247  ok
+stable        784404      784404      769456      769456  ok
+clmm         1179612     1179612     1155970     1155970  ok
+total                                1960673     1960673  ok
+```
+
+The Sui side talks **gRPC**, not JSON-RPC: public fullnodes have retired their
+JSON-RPC methods, and building a transaction against one now fails with
+`Method not found`.
+
 ## Benchmarks
 
 [`bench/`](bench) measures gas per venue on both chains and the replica's quote latency.
