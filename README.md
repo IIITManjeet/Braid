@@ -6,6 +6,10 @@ with a Rust market-data node in front of it.
 One order enters the router; it is split across four venues with different pricing math
 and rejoined into a single atomic settlement — the braided-river model the name comes from.
 
+**Live: [braid-4piq.onrender.com](https://braid-4piq.onrender.com)** — plan an order against
+either the router test fixture or the Sui testnet pools, and watch the optimizer split it.
+On a free instance, so the first request after an idle spell takes a few seconds to wake.
+
 ## Why this shape
 
 The project is deliberately scoped to cover three skills end-to-end:
@@ -413,6 +417,9 @@ Two host configs are checked in, both free-tier:
 [`render.yaml`](render.yaml) (Blueprint; sleeps when idle and cold-starts on the
 next request) and [`fly.toml`](fly.toml) (`fly deploy`; scales to zero). The
 image is host-agnostic -- anything that runs a container will do.
+
+The deployed instance runs from `render.yaml`:
+**[braid-4piq.onrender.com](https://braid-4piq.onrender.com)**.
 
 ## Benchmarks
 
