@@ -112,6 +112,43 @@ The on-chain anchor there is the real testnet swap below, whose result the repli
 reproduces exactly. On Aptos it is wired: `#[view]` quotes from a live node are compared with
 the replica before every deployment route is sent.
 
+## Machine-checked, not just fuzzed
+
+```bash
+bash scripts/prove.sh        # Move Prover over the math modules
+```
+
+The differential fuzzer checks *instances*: 3,029 generated cases, each a
+concrete triple of inputs and the answer the Rust replica computed. It is very
+good at catching two implementations drifting apart, and it says nothing at all
+about the inputs nobody generated.
+
+The Move Prover closes that gap. `full_math.spec.move` and
+`cpmm_math.spec.move` state the claims the module doc comments make in prose,
+and `aptos move prove` discharges them for **every** input the types allow:
+
+| Claim | Where |
+|---|---|
+| `mul_div_floor` is exactly `floor(a*b/d)`, and overflows only when the true quotient exceeds the width | `full_math` |
+| ceiling is never below floor, and never more than one unit above it | `full_math` |
+| **a constant-product pool cannot be drained** -- `amount_out < reserve_out` for any finite input | `cpmm_math` |
+| **`k` never decreases** -- `(x + dx)(y - dy) >= x*y` | `cpmm_math` |
+| the fee always rounds the pool's way, and the 10% cap means it cannot exceed the trade | `cpmm_math` |
+
+Spec arithmetic is arbitrary precision, which is what makes these worth stating:
+the implementation reaches its answer through widened `u256` intermediates
+narrowed back to `u64`, and the specs pin that round trip against mathematics
+that cannot itself overflow.
+
+**The specs are verified against negative controls, like the fuzzer.** Rounding
+`mul_div_floor` up instead of down fails with *post-condition does not hold*.
+Rounding the swap payout up in `amount_out` -- one word, and the kind of change
+that reads as harmless -- fails **both** the drain bound and the `k` invariant.
+
+They live in separate `.spec.move` files on purpose. Seven Move sources are
+byte-identical between `move/sui` and `move/aptos`, and inlining specs would
+have quietly ended that.
+
 ## Layout
 
 ```
@@ -487,4 +524,5 @@ bash scripts/test-aptos.sh      # Aptos: 574 Move tests
 - [x] Aptos deployment tooling: per-package resource accounts, seeding, a verified route (localnet)
 - [x] Benchmarks: gas per venue on both chains, quote and planning latency
 - [x] Web front end: Rust quote/route API, Next.js page, wallet execution
+- [x] Move Prover: `k` never decreases and the pool cannot be drained, for every input
 - [x] Aptos testnet: all seven packages published, four-venue route matching the plan

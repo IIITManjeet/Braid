@@ -44,3 +44,6 @@ NOTES.local.md
 # Live snapshot the web server writes when it re-reads the chain. Scratch:
 # the committed first-route snapshot is the one that is a record.
 deployments/routes/.live-snapshot.json
+
+# Move Prover scratch output.
+*.bpl
