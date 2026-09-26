@@ -110,7 +110,11 @@ jobs:
           chmod +x .tools/sui
           .tools/sui --version
 
+      # The Rust tests have their own job with a cargo cache; compiling the
+      # workspace a second time here would only make this job slower.
       - name: test every package
+        env:
+          BRAID_SKIP_RUST: "1"
         run: bash scripts/test.sh
 
   web:

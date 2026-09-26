@@ -23,8 +23,12 @@ for pkg in "$ROOT"/move/sui/*/; do
 done
 
 # The Rust replica: its own unit tests, and the source of the differential
-# cases the Move suites above just ran.
-if command -v cargo >/dev/null 2>&1; then
+# cases the Move suites above just ran. CI runs these in their own job with a
+# cargo cache, so it sets BRAID_SKIP_RUST rather than compiling the workspace
+# twice.
+if [ -n "${BRAID_SKIP_RUST:-}" ]; then
+  echo "BRAID_SKIP_RUST set -- skipping the Rust replica tests"
+elif command -v cargo >/dev/null 2>&1; then
   echo "=== rust (braid-quote) ==="
   if ! (cd "$ROOT/node" && cargo test --quiet); then
     failed=1
