@@ -9,3 +9,6 @@ license.workspace = true
 # replica has to reproduce that exactly -- a u128 intermediate would overflow
 # where Move's does not, and the results would silently diverge.
 ethnum.workspace = true
+
+[lints]
+workspace = true

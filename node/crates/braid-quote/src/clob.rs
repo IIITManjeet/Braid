@@ -44,9 +44,9 @@ impl Book {
             None => {
                 side.push((price, quantity));
                 if is_bid {
-                    side.sort_by(|a, b| b.0.cmp(&a.0));
+                    side.sort_by_key(|level| std::cmp::Reverse(level.0));
                 } else {
-                    side.sort_by(|a, b| a.0.cmp(&b.0));
+                    side.sort_by_key(|a| a.0);
                 }
             }
         }

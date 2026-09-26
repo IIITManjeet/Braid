@@ -1,0 +1,147 @@
+name: ci
+
+# Four things worth failing a build over, in rough order of how often they
+# catch something:
+#
+#   1. the Rust replica and the generated corpora agree (and regenerating them
+#      is deterministic -- if it is not, the corpora stop being reviewable)
+#   2. both Move VMs run every generated case
+#   3. the prover discharges the math invariants
+#   4. the front end still typechecks and builds
+#
+# The Sui and Aptos jobs each vendor their own CLI, because a machine set up for
+# one is not necessarily set up for the other -- the same reason
+# scripts/test.sh and scripts/test-aptos.sh are separate.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  APTOS_VERSION: "7.2.0"
+  SUI_VERSION: "mainnet-v1.78.1"
+
+jobs:
+  rust:
+    name: replica, optimizer, and corpus determinism
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: node
+
+      - name: test
+        working-directory: node
+        run: cargo test --release
+
+      - name: clippy
+        working-directory: node
+        run: cargo clippy --release --all-targets -- -D warnings
+
+      # The corpora are committed so that a repricing shows up as a reviewable
+      # diff. That only works if regenerating is deterministic, so this asserts
+      # it: regenerate, and require the tree to be unchanged.
+      - name: generated corpora are reproducible
+        working-directory: node
+        run: cargo run --release -p braid-difftest
+
+      - name: no diff after regenerating
+        run: |
+          if ! git diff --exit-code --stat; then
+            echo "::error::regenerating the corpora changed committed files -- a value moved, or the generator is not deterministic"
+            exit 1
+          fi
+
+  aptos:
+    name: aptos move tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: vendor the aptos cli
+        run: |
+          curl -fsSL -o aptos.zip \
+            "https://github.com/aptos-labs/aptos-core/releases/download/aptos-cli-v${APTOS_VERSION}/aptos-cli-${APTOS_VERSION}-Linux-x86_64.zip"
+          unzip -q aptos.zip -d .tools
+          chmod +x .tools/aptos
+          .tools/aptos --version
+
+      - name: test every package
+        run: bash scripts/test-aptos.sh
+
+  prover:
+    name: move prover
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: vendor the aptos cli
+        run: |
+          curl -fsSL -o aptos.zip \
+            "https://github.com/aptos-labs/aptos-core/releases/download/aptos-cli-v${APTOS_VERSION}/aptos-cli-${APTOS_VERSION}-Linux-x86_64.zip"
+          unzip -q aptos.zip -d .tools
+          chmod +x .tools/aptos
+
+      # Installs boogie and z3. Unlike the Windows path, this one completes.
+      - name: prover backends
+        run: |
+          .tools/aptos update prover-dependencies
+          echo "$HOME/.aptoscli/bin" >> "$GITHUB_PATH"
+
+      - name: prove the math modules
+        run: bash scripts/prove.sh
+
+  sui:
+    name: sui move tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: vendor the sui cli
+        run: |
+          curl -fsSL -o sui.tgz \
+            "https://github.com/MystenLabs/sui/releases/download/${SUI_VERSION}/sui-${SUI_VERSION}-ubuntu-x86_64.tgz"
+          mkdir -p .tools && tar -xzf sui.tgz -C .tools
+          chmod +x .tools/sui
+          .tools/sui --version
+
+      - name: test every package
+        run: bash scripts/test.sh
+
+  web:
+    name: front end
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: install
+        working-directory: web
+        run: npm ci --no-audit --no-fund
+
+      - name: typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: build
+        working-directory: web
+        run: npm run build
+
+  image:
+    name: container builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Builds both stages and the runtime image. Not pushed anywhere; the
+      # point is that the musl build and the entrypoint stay working.
+      - name: docker build
+        run: docker build -t braid .

@@ -7,3 +7,6 @@ license.workspace = true
 [dependencies]
 braid-quote = { path = "../braid-quote" }
 braid-route = { path = "../braid-route" }
+
+[lints]
+workspace = true

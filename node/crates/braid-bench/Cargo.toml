@@ -6,3 +6,6 @@ license.workspace = true
 
 [dependencies]
 braid-route = { path = "../braid-route" }
+
+[lints]
+workspace = true

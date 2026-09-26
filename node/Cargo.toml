@@ -8,5 +8,28 @@ version = "0.1.0"
 license = "Apache-2.0"
 rust-version = "1.90"
 
+# Lints declared once, with reasons, rather than silenced at each site.
+#
+# `braid-quote` is a transliteration of the Move, operation for operation,
+# because floor division does not reassociate and the generated corpora are
+# written against that exact sequence. Several clippy lints suggest idioms that
+# are better Rust and worse here: they stop the two implementations lining up
+# side by side, which is how a divergence gets spotted in review.
+#
+# `collapsible_if` is refused for a different reason -- a let-chain flattens two
+# conditions that are separate thoughts, and the guard reads better nested.
+[workspace.lints.clippy]
+manual_div_ceil = "allow"
+manual_is_multiple_of = "allow"
+manual_range_contains = "allow"
+collapsible_if = "allow"
+
+# The seeds are meant to be read. `0x5DEE_CE66_D` is the LCG multiplier out of
+# java.util.Random and `0x8Ea1_C0FF_EE` is a word; clippy wants both regrouped
+# into even nibbles, which is tidier and destroys the only thing they were
+# communicating.
+unusual_byte_groupings = "allow"
+mixed_case_hex_literals = "allow"
+
 [workspace.dependencies]
 ethnum = "1"

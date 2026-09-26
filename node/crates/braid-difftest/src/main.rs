@@ -113,7 +113,7 @@ fn batched(out: &mut String, name: &str, lines: &[String]) {
         for (j, l) in chunk.iter().enumerate() {
             let _ = writeln!(out, "        assert!({l}, {j});");
         }
-        let _ = write!(out, "    }}\n");
+        let _ = writeln!(out, "    }}");
     }
 }
 
@@ -140,7 +140,7 @@ fn gen_cpmm(rng: &mut Rng, n: usize) -> String {
             _ => rng.range(0, cpmm::MAX_FEE_BPS),
         };
         // Trade sizes from dust up to several times the pool.
-        let dx = rng.magnitude(0, 18).min(u64::MAX / 4).max(1);
+        let dx = rng.magnitude(0, 18).clamp(1, u64::MAX / 4);
 
         if let Ok(v) = cpmm::amount_out(dx, reserve_in, reserve_out, fee_bps) {
             amount_out.push(format!(
@@ -150,13 +150,12 @@ fn gen_cpmm(rng: &mut Rng, n: usize) -> String {
 
             // Feed the forward result back through the reverse direction, so the
             // exact-out path is exercised on values that are actually reachable.
-            if v > 0 {
-                if let Ok(back) = cpmm::amount_in(v, reserve_in, reserve_out, fee_bps) {
+            if v > 0
+                && let Ok(back) = cpmm::amount_in(v, reserve_in, reserve_out, fee_bps) {
                     amount_in.push(format!(
                         "cpmm_math::amount_in({v}, {reserve_in}, {reserve_out}, {fee_bps}) == {back}"
                     ));
                 }
-            }
         }
     }
 
@@ -213,13 +212,12 @@ fn gen_stable(rng: &mut Rng, n: usize) -> String {
             amount_out.push(format!(
                 "stable_math::amount_out({dx}, {r0}, {r1}, {amp}, {fee_bps}) == {v}"
             ));
-            if v > 0 {
-                if let Ok(back) = stable::amount_in(v, r0, r1, amp, fee_bps) {
+            if v > 0
+                && let Ok(back) = stable::amount_in(v, r0, r1, amp, fee_bps) {
                     amount_in.push(format!(
                         "stable_math::amount_in({v}, {r0}, {r1}, {amp}, {fee_bps}) == {back}"
                     ));
                 }
-            }
         }
     }
 

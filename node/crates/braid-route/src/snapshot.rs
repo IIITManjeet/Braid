@@ -150,57 +150,6 @@ pub fn parse(text: &str) -> Result<Snapshot, String> {
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{fixtures::router_test_world, optimize};
-
-    /// The router test world, written the way `scripts/route.py snapshot`
-    /// writes the live one -- big numbers as strings, ticks as raw triples.
-    const WORLD: &str = r#"{
-      "router_package": "0xR",
-      "coin_in": "0xC::usd::USD",
-      "coin_out": "0xC::eth::ETH",
-      "venues": [
-        {"kind": "cpmm", "object": "0x1", "a_to_b": true,
-         "reserve_in": 10000000, "reserve_out": "10000000", "fee_bps": 30},
-        {"kind": "stable", "object": "0x2", "a_to_b": true,
-         "reserve_in": 10000000, "reserve_out": 10000000, "amp": 10000, "fee_bps": 4},
-        {"kind": "clmm", "object": "0x3", "a_to_b": true,
-         "sqrt_price": "18446744073709551616", "tick": 0, "liquidity": "169187499",
-         "fee_bps": 30, "tick_spacing": 60,
-         "ticks": [[-600, "169187499", "169187499"], [600, "169187499", "-169187499"]]},
-        {"kind": "clob", "object": "0x4", "buy_base": true,
-         "tick_size": 100000, "lot_size": 10000, "taker_fee_bps": 10,
-         "asks": [[1000100000, 2000000], [1000500000, 2000000], [1001000000, 2000000]],
-         "bids": [[999900000, 2000000], [999500000, 2000000]]}
-      ]
-    }"#;
-
-    #[test]
-    fn a_parsed_snapshot_prices_exactly_like_the_fixture() {
-        let snap = parse(WORLD).unwrap();
-        let fixture = router_test_world();
-        for amount in [1_000u64, 250_000, 3_000_000, 20_000_000] {
-            for (a, b) in snap.venues.iter().zip(&fixture) {
-                assert_eq!(a.quote(amount), b.quote(amount), "{} at {amount}", a.kind());
-            }
-            assert_eq!(optimize(&snap.venues, amount), optimize(&fixture, amount));
-        }
-    }
-
-    #[test]
-    fn legs_name_the_router_function_and_the_venues_type_order() {
-        let snap = parse(WORLD).unwrap();
-        let usd = "0xC::usd::USD".to_string();
-        let eth = "0xC::eth::ETH".to_string();
-        assert_eq!(snap.leg_call(0), ("cpmm_a_to_b".into(), [usd.clone(), eth.clone()]));
-        assert_eq!(snap.leg_call(2), ("clmm_a_to_b".into(), [usd.clone(), eth.clone()]));
-        // The book is Market<ETH, USD>: buying ETH with USD is quote -> base.
-        assert_eq!(snap.leg_call(3), ("clob_quote_to_base".into(), [eth, usd]));
-    }
-}
-
 impl Snapshot {
     /// The router function and type arguments for a leg through `venue`.
     ///
@@ -251,5 +200,56 @@ impl Snapshot {
             })),
             "legs": legs,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{fixtures::router_test_world, optimize};
+
+    /// The router test world, written the way `scripts/route.py snapshot`
+    /// writes the live one -- big numbers as strings, ticks as raw triples.
+    const WORLD: &str = r#"{
+      "router_package": "0xR",
+      "coin_in": "0xC::usd::USD",
+      "coin_out": "0xC::eth::ETH",
+      "venues": [
+        {"kind": "cpmm", "object": "0x1", "a_to_b": true,
+         "reserve_in": 10000000, "reserve_out": "10000000", "fee_bps": 30},
+        {"kind": "stable", "object": "0x2", "a_to_b": true,
+         "reserve_in": 10000000, "reserve_out": 10000000, "amp": 10000, "fee_bps": 4},
+        {"kind": "clmm", "object": "0x3", "a_to_b": true,
+         "sqrt_price": "18446744073709551616", "tick": 0, "liquidity": "169187499",
+         "fee_bps": 30, "tick_spacing": 60,
+         "ticks": [[-600, "169187499", "169187499"], [600, "169187499", "-169187499"]]},
+        {"kind": "clob", "object": "0x4", "buy_base": true,
+         "tick_size": 100000, "lot_size": 10000, "taker_fee_bps": 10,
+         "asks": [[1000100000, 2000000], [1000500000, 2000000], [1001000000, 2000000]],
+         "bids": [[999900000, 2000000], [999500000, 2000000]]}
+      ]
+    }"#;
+
+    #[test]
+    fn a_parsed_snapshot_prices_exactly_like_the_fixture() {
+        let snap = parse(WORLD).unwrap();
+        let fixture = router_test_world();
+        for amount in [1_000u64, 250_000, 3_000_000, 20_000_000] {
+            for (a, b) in snap.venues.iter().zip(&fixture) {
+                assert_eq!(a.quote(amount), b.quote(amount), "{} at {amount}", a.kind());
+            }
+            assert_eq!(optimize(&snap.venues, amount), optimize(&fixture, amount));
+        }
+    }
+
+    #[test]
+    fn legs_name_the_router_function_and_the_venues_type_order() {
+        let snap = parse(WORLD).unwrap();
+        let usd = "0xC::usd::USD".to_string();
+        let eth = "0xC::eth::ETH".to_string();
+        assert_eq!(snap.leg_call(0), ("cpmm_a_to_b".into(), [usd.clone(), eth.clone()]));
+        assert_eq!(snap.leg_call(2), ("clmm_a_to_b".into(), [usd.clone(), eth.clone()]));
+        // The book is Market<ETH, USD>: buying ETH with USD is quote -> base.
+        assert_eq!(snap.leg_call(3), ("clob_quote_to_base".into(), [eth, usd]));
     }
 }

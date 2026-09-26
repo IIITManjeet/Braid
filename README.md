@@ -1,5 +1,7 @@
 # Braid
 
+[![ci](https://github.com/IIITManjeet/Braid/actions/workflows/ci.yml/badge.svg)](https://github.com/IIITManjeet/Braid/actions/workflows/ci.yml)
+
 A multi-venue on-chain exchange and router, built on Sui Move and ported to Aptos Move,
 with a Rust market-data node in front of it.
 
@@ -472,6 +474,10 @@ four-way split takes 4 ms, because the optimizer quotes hundreds of times.
   where the two chains genuinely disagree about what a program is.
 - [Benchmarks](bench/README.md) -- what a trade costs on each chain, and why
   the two chains rank the venues differently.
+- [Threat model](docs/security.md) -- what the rounding conventions, the
+  ability-less `Route` and the burned minimum liquidity are each defending
+  against, and the list of things this project does not defend against because
+  it does not have them.
 - [When Newton-Raphson never converges](docs/stableswap-limit-cycles.md) --
   the StableSwap `D` solver has states where it orbits forever instead of
   converging, and Curve's own implementation reverts on them. What causes it,
