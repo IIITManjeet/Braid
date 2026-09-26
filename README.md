@@ -2,15 +2,86 @@
 
 [![ci](https://github.com/IIITManjeet/Braid/actions/workflows/ci.yml/badge.svg)](https://github.com/IIITManjeet/Braid/actions/workflows/ci.yml)
 
-A multi-venue on-chain exchange and router, built on Sui Move and ported to Aptos Move,
-with a Rust market-data node in front of it.
+**One order, four pricing engines, two Move chains, and a proof they agree.**
 
-One order enters the router; it is split across four venues with different pricing math
-and rejoined into a single atomic settlement — the braided-river model the name comes from.
+Braid is an on-chain exchange with four different venue types — constant
+product, Curve StableSwap, concentrated liquidity, and a crit-bit order book —
+and a router that splits a single order across all four and settles it
+atomically. It is implemented twice, in Sui Move and Aptos Move, with a Rust
+replica of the pricing math that both Move VMs are held to, case by case.
 
-**Live: [braid-4piq.onrender.com](https://braid-4piq.onrender.com)** — plan an order against
-either the router test fixture or the Sui testnet pools, and watch the optimizer split it.
-On a free instance, so the first request after an idle spell takes a few seconds to wake.
+**[Try it: braid-4piq.onrender.com](https://braid-4piq.onrender.com)** — plan an
+order and watch the split. Free instance, so the first load wakes it up.
+
+|  |  |
+|---|---|
+| **Live on** | Sui testnet and Aptos testnet, every venue traded end to end |
+| **Move tests** | 570 on Sui, 574 on Aptos |
+| **Generated cases** | 3,029 formula, 150 whole-state scenarios, 25 optimizer plans — run by *both* VMs |
+| **Machine-checked** | `k` never decreases, and the pool cannot be drained, for every `u64` |
+| **Agreement** | 4 implementations produce 7,986,004 for the same order; the chain paid exactly that |
+
+```mermaid
+flowchart LR
+    O["order<br/>8,000,000 TUSD"] --> R
+
+    subgraph OFF [off-chain, Rust]
+        R["braid-route<br/>marginal-price equalisation"]
+        Q["braid-quote<br/>bit-exact replica"]
+        R <--> Q
+    end
+
+    R -->|plan, min_out| RT
+
+    subgraph ON [on-chain, Move]
+        RT["braid_router::Route<br/>no abilities — a hot potato"]
+        RT --> C["CPMM"]
+        RT --> S["StableSwap"]
+        RT --> L["CLMM"]
+        RT --> B["CLOB"]
+        C & S & L & B --> F["finish<br/>min_out on the total"]
+    end
+
+    F --> OUT["7,986,004 TETH"]
+
+    Q -.->|generates cases| D["braid-difftest"]
+    D -.->|same corpus| SUI["Sui Move VM"]
+    D -.->|same corpus| APT["Aptos Move VM"]
+```
+
+`Route` has no abilities — not `drop`, not `store`, not `key` — so a transaction
+that calls `begin` **cannot be built** without a `finish` to hand it to. The
+slippage check is not something the caller can forget; the code does not compile
+without it. Aptos has no programmable transactions, so the same structure is a
+transaction script there, and the guarantee survives the port.
+
+![The split, with each venue's marginal rate](docs/img/route-split.png)
+
+The leg table is the argument, not a summary of it. **Marginal** is what one
+more unit would earn at that allocation, per unit consumed; the optimizer stops
+when those are as equal as an integer staircase permits. Venues it left out show
+what they would have paid — if one of those sat above a leg in use, the split
+would be wrong.
+
+![Effective price against order size](docs/img/venue-curves.png)
+
+Output per unit of input, across four decades. The order book is worth nothing
+below one lot and then steps as lots fill; the concentrated pool falls away
+where it runs out of range; the route stays above all of them.
+
+### Where to look first
+
+| If you care about | Read |
+|---|---|
+| Move idioms and the ability system | [`braid_router/sources/route.move`](move/sui/braid_router/sources/route.move) |
+| Testing methodology | [The headline test](#the-headline-test) — a differential fuzzer across two VMs |
+| Formal verification | [Machine-checked, not just fuzzed](#machine-checked-not-just-fuzzed) |
+| The two dialects genuinely differing | [docs/aptos-port.md](docs/aptos-port.md) |
+| Security reasoning | [docs/security.md](docs/security.md) |
+| Execution models and contention | [docs/parallelism.md](docs/parallelism.md) |
+| Numerical edge cases | [docs/stableswap-limit-cycles.md](docs/stableswap-limit-cycles.md) |
+
+---
 
 ## Why this shape
 
@@ -474,6 +545,10 @@ four-way split takes 4 ms, because the optimizer quotes hundreds of times.
   where the two chains genuinely disagree about what a program is.
 - [Benchmarks](bench/README.md) -- what a trade costs on each chain, and why
   the two chains rank the venues differently.
+- [Contention on two execution models](docs/parallelism.md) -- Sui decides
+  parallelism before execution from the object model, Aptos discovers it at
+  runtime with Block-STM. What that means for a shared pool, why the order book
+  is the worst case on both, and what an owned-object book would change.
 - [Threat model](docs/security.md) -- what the rounding conventions, the
   ability-less `Route` and the burned minimum liquidity are each defending
   against, and the list of things this project does not defend against because
