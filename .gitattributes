@@ -20,5 +20,11 @@
 *.sh     text eol=lf
 Dockerfile text eol=lf
 
+# Move.lock records dependency paths. Generated on Windows it records them with
+# backslashes, which are a literal filename component on every other platform --
+# the Sui packages then fail to resolve their framework dependency at all. CI
+# guards against the separators; this guards against the line endings.
+Move.lock text eol=lf
+
 # Generated corpora: the point is that regenerating produces no diff.
 *.move linguist-generated=false

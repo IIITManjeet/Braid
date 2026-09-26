@@ -110,6 +110,19 @@ jobs:
           chmod +x .tools/sui
           .tools/sui --version
 
+      # A Move.lock generated on Windows records dependency paths with
+      # backslashes. Every other platform reads those as part of the filename,
+      # so the package cannot find its framework dependency and nothing builds.
+      # This is what the first red CI run was, and it meant the Sui half of the
+      # repository did not build for anyone who cloned it on Linux or macOS.
+      - name: lockfile paths are portable
+        run: |
+          if grep -rl '\' --include=Move.lock move/; then
+            echo "::error::a Move.lock records a Windows path separator; regenerate it or rewrite the separators"
+            exit 1
+          fi
+          echo "no backslashes in any Move.lock"
+
       # The Rust tests have their own job with a cargo cache; compiling the
       # workspace a second time here would only make this job slower.
       - name: test every package
