@@ -15,6 +15,8 @@
 
 mod api;
 mod repo;
+#[cfg(test)]
+mod tests;
 mod world;
 
 use std::net::SocketAddr;
@@ -22,9 +24,6 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
-use axum::Router;
-use axum::routing::{get, post};
-use tower_http::cors::CorsLayer;
 
 struct Args {
     port: u16,
@@ -90,22 +89,7 @@ async fn main() -> ExitCode {
     };
     let state = Arc::new(api::AppState::new(root.clone()));
 
-    let app = Router::new()
-        .route("/api/health", get(api::health))
-        .route("/api/worlds", get(api::worlds))
-        .route("/api/venues", get(api::venues))
-        .route("/api/curve", get(api::curve))
-        .route("/api/quote", post(api::quote))
-        .route("/api/route", post(api::route))
-        .route("/api/refresh", post(api::refresh))
-        .route("/api/deployments", get(api::deployments))
-        .route("/api/bench", get(api::bench))
-        .route("/api/difftest", get(api::difftest))
-        // The front end normally reaches this through Next's dev proxy, which
-        // makes it same-origin. Permissive CORS is for the case where it is
-        // served from somewhere else.
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+    let app = api::router(state);
 
     let addr = SocketAddr::from(([127, 0, 0, 1], args.port));
     let listener = match tokio::net::TcpListener::bind(addr).await {

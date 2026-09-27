@@ -10,7 +10,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 
 use axum::Json;
+use axum::Router;
 use axum::extract::{Query, State};
+use axum::routing::{get, post};
+use tower_http::cors::CorsLayer;
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use braid_route::{Plan, Venue, min_out, optimize};
@@ -367,6 +370,30 @@ pub async fn refresh(State(s): State<Arc<AppState>>) -> Res {
     let summary = w.summary();
     s.worlds.write().expect("worlds lock").insert(SUI_TESTNET.into(), Arc::new(w));
     Ok(Json(summary))
+}
+
+/// Every route the server answers, assembled over one shared state.
+///
+/// Built here rather than in `main` so a test can drive it with
+/// `tower::ServiceExt::oneshot` -- no socket, no port, no ordering between
+/// tests.
+pub fn router(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/api/health", get(health))
+        .route("/api/worlds", get(worlds))
+        .route("/api/venues", get(venues))
+        .route("/api/curve", get(curve))
+        .route("/api/quote", post(quote))
+        .route("/api/route", post(route))
+        .route("/api/refresh", post(refresh))
+        .route("/api/deployments", get(deployments))
+        .route("/api/bench", get(bench))
+        .route("/api/difftest", get(difftest))
+        // The front end normally reaches this through Next's dev proxy, which
+        // makes it same-origin. Permissive CORS is for the case where it is
+        // served from somewhere else.
+        .layer(CorsLayer::permissive())
+        .with_state(state)
 }
 
 pub async fn health(State(s): State<Arc<AppState>>) -> impl IntoResponse {
