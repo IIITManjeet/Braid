@@ -122,6 +122,8 @@
       "marketCap": "0x60c35da17f968b57845d218bc9d2882277e94e2167798ae30b23b4b81e6f16a7",
       "marketId": "0x396b0f0c0f36733ea9b3912b11f4037d399a2c117e03acb6106607c859fd1224",
       "quote": "TUSD",
+      "reseedNote": "The first four-venue route consumed every ask. Re-seeded 2026-09-27 with the same three levels -- 1.0001 / 1.0005 / 1.0010, 2,000,000 each, POST_ONLY so they could only rest -- so a live route crosses all four venues again.",
+      "reseededIn": "E7zBoQygeP84pFLiodPKdhZgPYACsxgGQYcN1QcaJum1",
       "seed": {
         "asks": [
           [

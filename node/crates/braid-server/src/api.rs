@@ -32,16 +32,19 @@ impl AppState {
     pub fn new(root: PathBuf) -> AppState {
         let mut worlds: HashMap<String, Arc<World>> = HashMap::new();
         worlds.insert(TEST_WORLD.into(), Arc::new(world::test_world()));
-        // The committed snapshot is a historical record; `refresh` replaces it
-        // with live state. Loading it here means the page has something real to
-        // draw before anyone asks the chain for anything.
-        let committed = root.join("deployments").join("routes").join("first-route-snapshot.json");
-        if let Ok(w) = world::from_snapshot_file(
-            &committed,
-            false,
-            "deployments/routes/first-route-snapshot.json".into(),
-        ) {
-            worlds.insert(SUI_TESTNET.into(), Arc::new(w));
+        // A committed snapshot, so the page has something real to draw before
+        // anyone asks the chain for anything. `latest-snapshot.json` is kept
+        // current; `first-route-snapshot.json` is the state the first
+        // four-venue route was planned against and is never updated, because
+        // re-planning it has to keep reproducing that executed plan exactly.
+        let routes = root.join("deployments").join("routes");
+        for name in ["latest-snapshot.json", "first-route-snapshot.json"] {
+            if let Ok(w) =
+                world::from_snapshot_file(&routes.join(name), false, format!("deployments/routes/{name}"))
+            {
+                worlds.insert(SUI_TESTNET.into(), Arc::new(w));
+                break;
+            }
         }
         AppState { root, worlds: RwLock::new(worlds) }
     }
