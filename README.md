@@ -206,12 +206,26 @@ and `aptos move prove` discharges them for **every** input the types allow:
 | ceiling is never below floor, and never more than one unit above it | `full_math` |
 | **a constant-product pool cannot be drained** -- `amount_out < reserve_out` for any finite input | `cpmm_math` |
 | **`k` never decreases** -- `(x + dx)(y - dy) >= x*y` | `cpmm_math` |
-| the fee always rounds the pool's way, and the 10% cap means it cannot exceed the trade | `cpmm_math` |
+| the fee always rounds the pool's way, and the cap means it cannot exceed the trade | `cpmm_math`, `stable_math` |
+| an integer widened into Q64.64 is exact and carries no fraction | `q64` |
+| subtraction reports an underflow rather than wrapping | `q64` |
 
 Spec arithmetic is arbitrary precision, which is what makes these worth stating:
 the implementation reaches its answer through widened `u256` intermediates
 narrowed back to `u64`, and the specs pin that round trip against mathematics
 that cannot itself overflow.
+
+**Where the prover stops.** It is worth being as clear about this as about the
+wins. `stable_math`'s `get_d` and `get_y` solve the Curve invariant by
+Newton-Raphson, and saying anything about their results means supplying a loop
+invariant that characterises the fixed point of an iteration which is not even
+guaranteed to converge -- there are states where it orbits, which is its own
+[document](docs/stableswap-limit-cycles.md). Those stay with the fuzzer and with
+the independent Python implementation. And the prover refuses to reason about a
+value through both bitwise and arithmetic operators, so `q64`'s mask-based
+`fract` and `floor` cannot be stated as `% Q64` at all; that claim is carried by
+unit tests. Writing a weak postcondition that happened to discharge would have
+been worse than leaving these out.
 
 **The specs are verified against negative controls, like the fuzzer.** Rounding
 `mul_div_floor` up instead of down fails with *post-condition does not hold*.

@@ -36,7 +36,7 @@ if [ -z "${BOOGIE_EXE:-}" ] || [ -z "${Z3_EXE:-}" ]; then
 fi
 
 # package:module-filter
-TARGETS="braid_math:full_math braid_cpmm:cpmm_math"
+TARGETS="braid_math:full_math braid_math:q64 braid_cpmm:cpmm_math braid_stable:stable_math"
 
 failed=0
 for target in $TARGETS; do
